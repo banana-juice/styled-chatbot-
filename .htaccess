@@ -1,0 +1,15 @@
+# ============================================
+# .htaccess — web root access rules
+# ============================================
+# Prevent secrets and version-control metadata from ever being served as
+# plain files over HTTP. .gitignore only keeps these out of commits — it
+# does nothing to stop a browser from requesting them directly, since they
+# still live inside the web root.
+
+# Block every dotfile (.env, .gitignore, .htaccess itself, etc.)
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Block the .git directory outright (exposes full repo history if reachable)
+RedirectMatch 404 /\.git(/|$)
