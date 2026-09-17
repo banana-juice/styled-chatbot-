@@ -14,7 +14,7 @@
   overflow: hidden;
 }
 .contact-eyebrow {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -31,7 +31,7 @@
   font-style: italic;
 }
 .contact-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.8;
   margin-bottom: 40px;
@@ -68,14 +68,14 @@
   object-fit: contain;
 }
 .contact-info-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 .contact-info-val {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.6;
 }
@@ -121,7 +121,7 @@
   border: 1px solid var(--border);
   background: var(--cream);
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-main);
   outline: none;
   transition: border-color 0.2s;
@@ -148,7 +148,7 @@
   border: none;
   padding: 16px;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 3px;
   text-transform: uppercase;
   cursor: pointer;
@@ -176,14 +176,14 @@
   margin-top: 2px;
 }
 .hours-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 4px;
 }
 .hours-val {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 .success-msg {
@@ -192,7 +192,7 @@
   border: 1px solid #a5d6a7;
   color: #2e7d32;
   padding: 16px 20px;
-  font-size: 13px;
+  font-size: 14px;
   margin-bottom: 16px;
   letter-spacing: 0.5px;
   position: relative;

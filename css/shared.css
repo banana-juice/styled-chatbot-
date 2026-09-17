@@ -38,7 +38,7 @@ body {
   color: #e8ddd0;
   text-align: center;
   padding: 10px 20px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   display: flex;
@@ -63,7 +63,7 @@ body {
   flex-shrink: 0;
 }
 .announcement-bar .ann-right {
-  font-size: 11px;
+  font-size: 12px;
   display: flex;
   gap: 16px;
 }
@@ -118,7 +118,7 @@ nav {
 .nav-links a {
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 2px;
   text-transform: uppercase;
   padding-bottom: 4px;
@@ -213,7 +213,7 @@ nav {
   margin-bottom: 4px;
 }
 .trust-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 .trust-divider {
@@ -240,7 +240,7 @@ footer {
   margin-bottom: 16px;
 }
 .footer-tagline {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   line-height: 1.7;
   margin-bottom: 20px;
@@ -268,7 +268,7 @@ footer {
   display: block;
 }
 .footer-col h4 {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   margin-bottom: 20px;
@@ -283,7 +283,7 @@ footer {
 .footer-col ul li a {
   text-decoration: none;
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   transition: color 0.2s;
 }
 .footer-col ul li a:hover {
@@ -297,7 +297,7 @@ footer {
   align-items: center;
 }
 .footer-copy {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 .footer-legal {
@@ -305,7 +305,7 @@ footer {
   gap: 24px;
 }
 .footer-legal a {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   text-decoration: none;
 }
@@ -374,7 +374,7 @@ footer {
   border: none;
   padding: 14px 32px;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   cursor: pointer;
@@ -391,7 +391,7 @@ footer {
   border: 1px solid var(--text-main);
   padding: 14px 32px;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   cursor: pointer;
@@ -436,7 +436,7 @@ footer {
   border: none;
   border-bottom: 1px solid var(--border);
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
   letter-spacing: 0.5px;
   background: var(--warm-white);
   color: var(--text-main);
@@ -446,7 +446,7 @@ footer {
 
 #search-input::placeholder {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 13px;
 }
 
 #search-input:focus {
@@ -475,7 +475,7 @@ footer {
 
 .search-result-name {
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-main);
   margin-bottom: 4px;
@@ -483,7 +483,7 @@ footer {
 }
 
 .search-result-category {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -497,7 +497,7 @@ footer {
 .search-result-empty {
   padding: 24px 16px;
   text-align: center;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1px;
   color: var(--text-muted);
   font-family: var(--sans);
@@ -575,13 +575,13 @@ footer {
   letter-spacing: 0.5px;
 }
 .pd-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-main);
   margin-bottom: 2px;
 }
 .pd-email {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -598,7 +598,7 @@ footer {
   align-items: center;
   gap: 10px;
   padding: 12px 20px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.5px;
   color: var(--text-muted);
   text-decoration: none;
@@ -621,7 +621,7 @@ footer {
   width: 100%;
   text-align: left;
   padding: 12px 20px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.5px;
   color: #a0341b;
   background: none;
@@ -645,7 +645,7 @@ footer {
   color: var(--text-main);
 }
 .pd-guest-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   line-height: 1.6;
   margin-bottom: 16px;
@@ -656,7 +656,7 @@ footer {
   color: #f5ede4;
   text-decoration: none;
   padding: 11px 20px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   font-family: var(--sans);
@@ -741,7 +741,7 @@ footer {
   flex-shrink: 0;
 }
 .wl-eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -805,7 +805,7 @@ footer {
   color: var(--text-main);
 }
 .wl-empty-sub {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   line-height: 1.7;
 }
@@ -813,7 +813,7 @@ footer {
   background: var(--brown-dark);
   color: #f5ede4;
   padding: 12px 28px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   text-decoration: none;
@@ -879,13 +879,13 @@ footer {
 }
 
 .wl-item-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 400;
   color: var(--text-main);
   align-self: end;
 }
 .wl-item-price {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
 }
 .wl-add-cart {
@@ -893,7 +893,7 @@ footer {
   color: #f5ede4;
   border: none;
   padding: 7px 0;
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.8px;
   text-transform: uppercase;
   cursor: pointer;
@@ -1008,7 +1008,7 @@ footer {
 }
 
 .pm-category {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1026,7 +1026,7 @@ footer {
   letter-spacing: 1px;
 }
 .pm-reviews {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0;
 }
@@ -1037,12 +1037,12 @@ footer {
   font-family: var(--serif);
 }
 .pm-desc {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.8;
 }
 .pm-section-label {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -1074,7 +1074,7 @@ footer {
   border: 1px solid var(--border);
   background: transparent;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 1px;
   cursor: pointer;
   transition: all 0.2s;
@@ -1126,7 +1126,7 @@ footer {
   border: none;
   padding: 15px;
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   cursor: pointer;
@@ -1151,7 +1151,7 @@ footer {
   border: 1px solid var(--border);
   padding: 12px;
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
   cursor: pointer;
@@ -1191,7 +1191,7 @@ footer {
   background: var(--brown-dark);
   color: #f5ede4;
   padding: 12px 28px;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
   opacity: 0;

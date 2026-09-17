@@ -49,7 +49,7 @@
 }
 
 .os-hello {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -75,7 +75,7 @@
   align-items: center;
   gap: 16px;
   padding: 20px 32px;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -118,7 +118,7 @@
   background: transparent;
   border: 1px solid var(--border);
 
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
 
@@ -142,7 +142,7 @@
 }
 
 .om-eyebrow {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -233,7 +233,7 @@
 }
 
 .order-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   letter-spacing: 0.3px;
 }
@@ -246,7 +246,7 @@
 }
 
 .order-status {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 6px 14px;
@@ -320,7 +320,7 @@
 }
 
 .oe-cta {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-main);
@@ -341,7 +341,7 @@
   border: 1px solid var(--border);
   padding: 14px 40px;
   font-family: var(--sans);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -364,7 +364,7 @@
   background: none;
   border: none;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -392,7 +392,7 @@
 }
 
 .od-status-badge {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 9px 18px;
@@ -421,7 +421,7 @@
 }
 
 .od-meta-label {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -439,7 +439,7 @@
 }
 
 .od-section-title {
-  font-size: 9px;
+  font-size: 10px;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -523,7 +523,7 @@
 }
 
 .ts-label {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -540,7 +540,7 @@
 }
 
 .ts-date {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--text-muted);
   margin-top: 3px;
   text-align: center;
@@ -589,7 +589,7 @@
 }
 
 .od-item-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -622,7 +622,7 @@
 }
 
 .od-address {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 2;
 }
@@ -630,7 +630,7 @@
 .od-total-row {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-muted);
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
@@ -671,7 +671,7 @@
 
 .ts-meta-label {
   font-family: "Jost", sans-serif;
-  font-size: 0.65rem;
+  font-size: 0.7rem;
   font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
