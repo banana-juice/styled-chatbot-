@@ -14,7 +14,8 @@
   z-index: var(--z-base); 
 }
 .section-eyebrow {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -23,7 +24,7 @@
 .about-hero-title {
   font-family: var(--serif);
   font-size: clamp(44px, 5vw, 68px);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.05;
   margin-bottom: 32px;
 }
@@ -31,7 +32,7 @@
   font-style: italic;
 }
 .about-body {
-  font-size: 14px;
+  font-size: 17px;
   color: var(--text-muted);
   line-height: 1.9;
   margin-bottom: 16px;
@@ -44,8 +45,8 @@
 }
 .about-tagline {
   font-family: var(--sans);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   letter-spacing: 1px;
   margin-top: 16px;
 }

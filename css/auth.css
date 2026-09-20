@@ -45,7 +45,8 @@ body {
   align-items: center;
   padding: 28px 32px;
   background: var(--cream);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto; /* larger type can make the form taller than the viewport */
 }
 
 .auth-logo {
@@ -71,7 +72,8 @@ body {
 
 .auth-logo-text {
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 4px;
   text-transform: uppercase;
   color: var(--brown-mid);
@@ -103,7 +105,8 @@ body {
   background: none;
   border: none;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -130,7 +133,7 @@ body {
 
 .tab-btn.active {
   color: var(--text-main);
-  font-weight: 500;
+  font-weight: 600;
   background: var(--cream);
 }
 
@@ -174,16 +177,16 @@ body {
 .form-title {
   font-family: var(--serif);
   font-size: clamp(28px, 3vw, 40px);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.1;
   margin-bottom: 2px;
 }
 
 .form-subtitle {
   font-family: var(--serif);
-  font-size: clamp(14px, 1.5vw, 18px);
+  font-size: clamp(16px, 1.7vw, 20px);
   font-style: italic;
-  font-weight: 300;
+  font-weight: 400;
   color: var(--text-muted);
   margin-bottom: 16px;
 }
@@ -228,7 +231,7 @@ body {
   border: none;
   background: transparent;
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-main);
   outline: none;
 }
@@ -257,7 +260,8 @@ body {
 
 .field-err {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--error);
   letter-spacing: 0.3px;
   margin-top: 3px;
@@ -277,7 +281,8 @@ body {
   transition: background 0.3s;
 }
 .strength-label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 500;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -297,7 +302,8 @@ body {
 }
 
 .pw-reqs-label {
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -308,7 +314,8 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 12.5px;
+  font-size: 14px;
+  font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.2px;
   transition: color 0.25s;
@@ -387,8 +394,8 @@ body {
 
 .modal-title {
   font-family: var(--serif);
-  font-size: 32px;
-  font-weight: 300;
+  font-size: 34px;
+  font-weight: 400;
   margin-bottom: 8px;
   color: var(--text-main);
 }
@@ -396,14 +403,14 @@ body {
 .modal-sub {
   font-family: var(--serif);
   font-style: italic;
-  font-size: 17px;
-  font-weight: 300;
+  font-size: 19px;
+  font-weight: 400;
   color: var(--text-muted);
   margin-bottom: 10px;
 }
 
 .modal-body {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
   line-height: 1.7;
   margin-bottom: 32px;
@@ -415,7 +422,8 @@ body {
   border: none;
   padding: 15px 40px;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 3px;
   text-transform: uppercase;
   cursor: pointer;
@@ -455,7 +463,8 @@ body {
   align-items: center;
   gap: 10px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text-muted);
   user-select: none;
 }
@@ -468,7 +477,8 @@ body {
 }
 
 .forgot-link {
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text-muted);
   text-decoration: none;
   transition: color 0.2s;
@@ -485,7 +495,8 @@ body {
   border: none;
   padding: 13px;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 600;
   letter-spacing: 3px;
   text-transform: uppercase;
   cursor: pointer;
@@ -539,7 +550,7 @@ body {
 
 /* ── SWITCH TEXT ────────────────────────────────────────── */
 .switch-text {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
   text-align: center;
 }
@@ -548,12 +559,12 @@ body {
   background: none;
   border: none;
   font-family: var(--sans);
-  font-size: 13px;
+  font-size: 15px;
   color: var(--brown-mid);
   text-decoration: underline;
   text-underline-offset: 3px;
   cursor: pointer;
-  font-weight: 500;
+  font-weight: 600;
   transition: color 0.2s;
 }
 .switch-btn:hover {
@@ -562,7 +573,7 @@ body {
 
 /* ── TERMS ──────────────────────────────────────────────── */
 .terms-note {
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-muted);
   line-height: 1.5;
   margin-bottom: 10px;
@@ -613,7 +624,8 @@ body {
   background: var(--brown-dark);
   color: #f5ede4;
   padding: 14px 30px;
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: 2px;
   text-transform: uppercase;
   opacity: 0;

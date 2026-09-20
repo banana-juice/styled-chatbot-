@@ -60,7 +60,7 @@
   color: var(--warm-white);
   padding: 14px 16px;
   font-family: var(--serif);
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -94,7 +94,7 @@
   max-width: 85%;
   padding: 10px 14px;
   border-radius: 14px;
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.5;
   white-space: pre-wrap;
   word-wrap: break-word;
@@ -129,7 +129,7 @@
   border: none;
   padding: 12px 14px;
   font-family: var(--sans);
-  font-size: 14px;
+  font-size: 16px;
   background: transparent;
   color: var(--text-main);
 }

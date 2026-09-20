@@ -989,7 +989,7 @@ function updateProfileUI() {
     const adminBadge = isAdmin
       ? `<span style="
             display:inline-block;
-            font-size:10px;
+            font-size:11px;
             font-weight:600;
             letter-spacing:.06em;
             background:#2c1f14;

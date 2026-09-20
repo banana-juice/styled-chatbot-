@@ -321,7 +321,7 @@ async function renderDashboard() {
                         <div class="flex-center gap-12">
                             <div class="product-thumb" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
                             <div>
-                                <div style="font-size:13.5px;font-weight:500;color:var(--brown-400)">${p.name}</div>
+                                <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${p.name}</div>
                                 <div class="text-sm text-muted">${p.quantity_sold} sold</div>
                             </div>
                         </div>
@@ -346,11 +346,11 @@ async function renderDashboard() {
                               <div class="flex-center gap-12">
                                   <div class="product-thumb" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
                                   <div>
-                                      <div style="font-size:13.5px;font-weight:500;color:var(--brown-400)">${i.product_name}</div>
+                                      <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${i.product_name}</div>
                                       <div class="text-sm text-muted">${i.size} — ${i.category}</div>
                                   </div>
                               </div>
-                              <div style="font-size:13px;font-weight:500;color:var(--red)">${i.stock_qty} left</div>
+                              <div style="font-size:14px;font-weight:500;color:var(--red)">${i.stock_qty} left</div>
                           </div>`,
             )
             .join("")
@@ -469,7 +469,7 @@ async function openOrderDetail(orderNumber) {
       <div class="order-item">
         <div class="order-item-img" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
         <div style="flex:1">
-          <div style="font-weight:500;font-size:13.5px;color:var(--brown-400)">${item.product_name}</div>
+          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${item.product_name}</div>
           <div class="text-sm text-muted">${item.size || ""} × ${qty}</div>
         </div>
         <div style="font-weight:500">${formatPrice(price * qty)}</div>
@@ -503,9 +503,9 @@ async function openOrderDetail(orderNumber) {
     // Customer
     document.getElementById("detail-customer").innerHTML = `
       <div class="flex-center gap-12" style="margin-bottom:12px">
-        <div class="customer-avatar" style="width:38px;height:38px;font-size:15px">${initials(o.customer_name)}</div>
+        <div class="customer-avatar" style="width:38px;height:38px;font-size:16px">${initials(o.customer_name)}</div>
         <div>
-          <div style="font-weight:500;font-size:13.5px;color:var(--brown-400)">${o.customer_name || "—"}</div>
+          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${o.customer_name || "—"}</div>
           <div class="text-sm text-muted">${o.customer_email || ""}</div>
         </div>
       </div>`;
@@ -528,7 +528,7 @@ async function openOrderDetail(orderNumber) {
     const actionsContainer = headerActions?.closest("div[style*='gap: 8px']");
     if (actionsContainer) {
       actionsContainer.innerHTML = `
-        <select class="filter-select" id="status-select" style="height:36px;font-size:13px">
+        <select class="filter-select" id="status-select" style="height:36px;font-size:14px">
           ${[
             "pending",
             "processing",
@@ -560,7 +560,7 @@ async function openOrderDetail(orderNumber) {
           <div class="timeline-item">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
-              <div style="font-weight:500;font-size:13.5px;color:var(--brown-400)">${t.step_label}</div>
+              <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${t.step_label}</div>
               <div class="text-sm text-muted">${t.occurred_at ? new Date(t.occurred_at).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</div>
               ${t.note ? `<div class="text-sm text-muted" style="margin-top:2px">${t.note}</div>` : ""}
             </div>
@@ -1091,7 +1091,7 @@ async function renderAnalytics() {
           (p, i) => `
         <div class="metric-row">
           <div>
-            <div style="font-size:13.5px;font-weight:500;color:var(--brown-400)">${i + 1}. ${p.name}</div>
+            <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${i + 1}. ${p.name}</div>
             <div class="text-sm text-muted">${p.quantity_sold} sold</div>
           </div>
           <div class="text-sm text-bold">${formatPrice(p.revenue)}</div>
@@ -1302,7 +1302,7 @@ async function renderInventory() {
           <tr>
             <td style="font-weight:500;color:var(--brown-400)">${item.product_name}</td>
             <td class="text-muted">${item.size || "—"}</td>
-            <td><code style="font-size:12px;background:var(--beige-100);padding:2px 6px;border-radius:3px">${item.sku || "—"}</code></td>
+            <td><code style="font-size:13px;background:var(--beige-100);padding:2px 6px;border-radius:3px">${item.sku || "—"}</code></td>
             <td class="text-muted">${item.category}</td>
             <td>
               <div class="flex-center gap-8">
@@ -1313,7 +1313,7 @@ async function renderInventory() {
             <td>${statusBadge(status)}</td>
             <td>
               <div class="flex-center gap-6">
-                <input class="form-input" type="number" value="${qty}" min="0" id="inv-qty-${item.size_id}" style="width:65px;height:30px;padding:0 8px;font-size:13px" />
+                <input class="form-input" type="number" value="${qty}" min="0" id="inv-qty-${item.size_id}" style="width:65px;height:30px;padding:0 8px;font-size:14px" />
                 <button class="btn btn-outline btn-sm" onclick="updateStock(${item.size_id})">Update</button>
               </div>
             </td>
@@ -1570,12 +1570,12 @@ async function viewContactMessage(id) {
     overlay.style.cssText =
       "position:fixed;inset:0;background:rgba(28,17,9,.45);z-index:9000;display:flex;align-items:center;justify-content:center";
     overlay.innerHTML = `<div style="background:#fff;border-radius:4px;padding:28px 32px;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(28,17,9,.18)">
-      <div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--brown-100);margin-bottom:6px">Contact Message</div>
-      <div style="font-weight:500;color:var(--brown-400);font-size:16px;margin-bottom:4px">${m.subject}</div>
-      <div style="color:var(--brown-200);font-size:13px;margin-bottom:14px">${m.name} &lt;${m.email}&gt;</div>
-      <div style="font-size:13.5px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${m.message}</div>
+      <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brown-100);margin-bottom:6px">Contact Message</div>
+      <div style="font-weight:500;color:var(--brown-400);font-size:17px;margin-bottom:4px">${m.subject}</div>
+      <div style="color:var(--brown-200);font-size:14px;margin-bottom:14px">${m.name} &lt;${m.email}&gt;</div>
+      <div style="font-size:15px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${m.message}</div>
       <div style="margin-top:20px;text-align:right">
-        <button onclick="document.getElementById('_msg-overlay').remove()" style="background:var(--brown-400);color:#fff;border:none;border-radius:4px;padding:8px 18px;font-size:13px;cursor:pointer">Close</button>
+        <button onclick="document.getElementById('_msg-overlay').remove()" style="background:var(--brown-400);color:#fff;border:none;border-radius:4px;padding:8px 18px;font-size:14px;cursor:pointer">Close</button>
       </div>
     </div>`;
     overlay.addEventListener("click", (e) => {
@@ -1737,8 +1737,8 @@ const baseOptions = {
       borderColor: "#e6ddd2",
       borderWidth: 1,
       padding: 10,
-      titleFont: { family: "'Cormorant Garamond', serif", size: 14 },
-      bodyFont: { family: "'DM Sans', sans-serif", size: 12 },
+      titleFont: { family: "'Cormorant Garamond', serif", size: 15 },
+      bodyFont: { family: "'DM Sans', sans-serif", size: 13 },
     },
   },
   scales: {
@@ -1746,7 +1746,7 @@ const baseOptions = {
       grid: { display: false },
       ticks: {
         color: "#b8a090",
-        font: { family: "'DM Sans', sans-serif", size: 11 },
+        font: { family: "'DM Sans', sans-serif", size: 12 },
       },
       border: { display: false },
     },
@@ -1754,7 +1754,7 @@ const baseOptions = {
       grid: { color: "rgba(230,221,210,0.6)" },
       ticks: {
         color: "#b8a090",
-        font: { family: "'DM Sans', sans-serif", size: 11 },
+        font: { family: "'DM Sans', sans-serif", size: 12 },
       },
       border: { display: false },
     },
@@ -1905,7 +1905,7 @@ function initCharts(page) {
               display: true,
               position: "right",
               labels: {
-                font: { family: "'DM Sans'", size: 11 },
+                font: { family: "'DM Sans'", size: 12 },
                 color: "#7d6450",
                 padding: 12,
               },

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=DM+Sans:wght@300;400;500;600&display=swap");
 
 *,
 *::before,
@@ -41,7 +41,7 @@
   --red: #7a2828;
   --green: #27503a;
   --blue: #1e3f6a;
-  --sidebar-w: 232px;
+  --sidebar-w: 252px;
   --topbar-h: 58px;
   --font-serif: "Cormorant Garamond", Georgia, serif;
   --font-sans: "DM Sans", -apple-system, sans-serif;
@@ -61,7 +61,7 @@ body {
   background: var(--bg);
   color: var(--ink-700);
   font-family: var(--font-sans);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
 }
@@ -101,8 +101,8 @@ body {
 
 .sidebar-logo .brand {
   font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 400;
+  font-size: 18px;
+  font-weight: 500;
   letter-spacing: 0.22em;
   color: #f0e8df;
   text-transform: uppercase;
@@ -126,8 +126,8 @@ body {
 
 .sidebar-logo .brand {
   font-family: var(--font-serif);
-  font-size: 17px;
-  font-weight: 400;
+  font-size: 18px;
+  font-weight: 500;
   letter-spacing: 0.22em;
   color: #f0e8df;
   text-transform: uppercase;
@@ -242,15 +242,16 @@ body {
   min-width: 0;
 }
 .user-name {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 14.5px;
+  font-weight: 600;
   color: rgba(255, 255, 255, 0.8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .user-email {
-  font-size: 11.5px;
+  font-size: 12.5px;
+  font-weight: 500;
   color: rgba(255, 255, 255, 0.38);
   white-space: nowrap;
   overflow: hidden;
@@ -370,10 +371,10 @@ body {
   color: var(--ink-300);
   padding: 7px 12px;
   border: none;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.04em;
   text-transform: none;
-  font-weight: 400;
+  font-weight: 500;
   border-radius: var(--r-2);
 }
 .btn-ghost:hover {
@@ -393,7 +394,7 @@ body {
 
 .btn-sm {
   padding: 6px 14px;
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 .btn-icon {
   padding: 7px;
@@ -504,7 +505,8 @@ body {
 }
 
 .stat-change {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   margin-top: 8px;
   display: flex;
   align-items: center;
@@ -881,12 +883,12 @@ tbody td {
   flex: 1;
 }
 .timeline-label {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--ink-500);
 }
 .timeline-time {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--ink-100);
   margin-top: 1px;
 }
@@ -1058,7 +1060,8 @@ tbody td {
   padding: 13px 16px;
   border-radius: var(--r-2);
   margin-bottom: 20px;
-  font-size: 14px;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .alert-warning {
@@ -1261,7 +1264,8 @@ tbody td {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .legend-dot {
@@ -1355,7 +1359,7 @@ tbody td {
   margin-bottom: 20px;
 }
 .text-sm {
-  font-size: 12.5px;
+  font-size: 13.5px;
 }
 .text-muted {
   color: var(--ink-100);
@@ -1393,8 +1397,8 @@ tbody td {
   min-width: 80px;
 }
 .stock-num {
-  font-size: 13.5px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   min-width: 22px;
 }
 
@@ -1475,10 +1479,10 @@ tbody td {
 
 .nav-item {
   border-radius: 0;
-  font-size: 13px;
+  font-size: 14px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  font-weight: 400;
+  font-weight: 500;
   padding: 10px 14px;
   border-left: 2px solid transparent;
 }
@@ -1487,7 +1491,7 @@ tbody td {
   background: rgba(184, 146, 74, 0.1);
   color: var(--gold-light);
   border-left: 2px solid var(--gold);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .nav-item:hover {
@@ -1496,7 +1500,8 @@ tbody td {
 }
 
 .nav-label {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.22em;
 }
 
@@ -1516,18 +1521,18 @@ tbody td {
 }
 
 .topbar-title {
-  font-size: 20px;
-  font-weight: 300;
+  font-size: 24px;
+  font-weight: 400;
   letter-spacing: 0.04em;
 }
 
 /* ── Buttons — sharp, minimal, refined ── */
 .btn {
   border-radius: 0;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: 600;
   padding: 9px 18px;
   transition: all 0.18s ease;
 }
@@ -1574,10 +1579,10 @@ tbody td {
 }
 
 .card-title {
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--brown-200);
   font-family: var(--font-body);
 }
@@ -1594,23 +1599,24 @@ tbody td {
 }
 
 .stat-value {
-  font-size: 28px;
-  font-weight: 300;
+  font-size: 32px;
+  font-weight: 400;
   letter-spacing: -0.01em;
 }
 
 .stat-label {
-  font-size: 10px;
+  font-size: 11px;
+  font-weight: 600;
   letter-spacing: 0.18em;
 }
 
 /* ── Badges — sharp pill → sharp rectangle ── */
 .badge {
   border-radius: 0;
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 500;
+  font-weight: 600;
   padding: 3px 8px;
 }
 
@@ -1628,10 +1634,10 @@ tbody td {
 .pill-tab {
   border-radius: 0;
   padding: 10px 20px;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  font-weight: 400;
+  font-weight: 500;
   color: var(--brown-100);
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -1658,7 +1664,7 @@ tbody td {
 .form-textarea {
   border-radius: 0;
   border: 1px solid var(--beige-300);
-  font-size: 14px;
+  font-size: 15px;
   letter-spacing: 0.02em;
 }
 
@@ -1674,26 +1680,26 @@ tbody td {
 
 /* ── Form labels ── */
 .form-label {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--brown-100);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 /* ── Table ── */
 thead th {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--brown-100);
   border-bottom: 1px solid var(--beige-300);
   padding: 0 12px 12px;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 tbody td {
-  font-size: 14px;
+  font-size: 15px;
   padding: 12px 12px;
   border-bottom: 1px solid var(--beige-100);
 }
@@ -1705,7 +1711,8 @@ tbody tr:hover {
 /* ── Role badges ── */
 .role-badge {
   border-radius: 0;
-  font-size: 11px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1723,8 +1730,8 @@ tbody tr:hover {
 }
 
 .modal-title {
-  font-size: 18px;
-  font-weight: 300;
+  font-size: 22px;
+  font-weight: 400;
   letter-spacing: 0.04em;
   font-family: var(--font-display);
 }
@@ -1780,7 +1787,7 @@ tbody tr:hover {
 /* ── Pagination ── */
 .page-btn {
   border-radius: 0;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   border: 1px solid var(--beige-200);
   width: 28px;
@@ -1801,7 +1808,8 @@ tbody tr:hover {
 
 /* ── Back link ── */
 .back-link {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
 }
@@ -1815,7 +1823,8 @@ tbody tr:hover {
 /* ── Settings nav ── */
 .settings-nav-item {
   border-radius: 0;
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: 0.06em;
   border-left: 2px solid transparent;
 }
@@ -1888,7 +1897,7 @@ tbody tr:hover {
 /* ── Code tag (SKU) ── */
 code {
   border-radius: 0 !important;
-  font-size: 12px;
+  font-size: 13px;
   letter-spacing: 0.06em;
   background: var(--beige-100) !important;
   border: 1px solid var(--beige-200);
@@ -1904,7 +1913,7 @@ code {
   color: #fff;
   padding: 11px 20px;
   border-radius: 4px;
-  font-size: 13.5px;
+  font-size: 15px;
   font-family: var(--font-body);
   box-shadow: 0 4px 16px rgba(28, 17, 9, 0.22);
   opacity: 0;
@@ -1990,7 +1999,7 @@ code {
   border: none;
   background: transparent;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 14px;
   padding: 2px 4px;
   border-radius: 4px;
   transition: background 0.15s;
@@ -2014,7 +2023,7 @@ code {
   padding: 8px 14px;
   border: 1px dashed #9ca3af;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   color: #6b7280;
   transition:
     border-color 0.15s,
@@ -2032,7 +2041,7 @@ code {
 
 .no-images-msg {
   color: #9ca3af;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .product-image-thumb {

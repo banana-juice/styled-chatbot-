@@ -133,7 +133,7 @@ async function renderCart() {
     totalQty += qty;
 
     const sizeLabel = item.size
-      ? `<span style="margin-left:6px;font-size:11px;color:var(--text-muted);">Size: ${item.size}</span>`
+      ? `<span style="margin-left:6px;font-size:13px;color:var(--text-muted);">Size: ${item.size}</span>`
       : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
@@ -231,7 +231,7 @@ function updateTotals(subtotal) {
         taxRow = document.createElement("div");
         taxRow.id = "tax-row";
         taxRow.className = "total-row";
-        taxRow.style.fontSize = "13px";
+        taxRow.style.fontSize = "15px";
         taxRow.innerHTML = `<span>VAT (${taxRate}%)</span><span id="tax-val"></span>`;
         shippingRow.insertAdjacentElement("afterend", taxRow);
       }

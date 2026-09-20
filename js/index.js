@@ -60,7 +60,7 @@ function showProductsSpinner() {
       <div style="width:32px;height:32px;border:2px solid #e0d6cc;
                   border-top-color:#8c7b6e;border-radius:50%;
                   animation:spin .75s linear infinite;"></div>
-      <span style="font-size:12px;letter-spacing:1.5px;text-transform:uppercase;">
+      <span style="font-size:14px;letter-spacing:1.5px;text-transform:uppercase;">
         Loading products…
       </span>
     </div>
@@ -72,7 +72,7 @@ function showProductsError(message) {
   if (!grid) return;
   grid.innerHTML = `
     <div style="grid-column:1/-1;text-align:center;padding:60px 0;
-                color:var(--text-muted);font-size:13px;letter-spacing:1px;">
+                color:var(--text-muted);font-size:15px;letter-spacing:1px;">
       <svg style="width:32px;height:32px;margin-bottom:12px;opacity:.4;"
            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <circle cx="12" cy="12" r="10"/>
@@ -82,7 +82,7 @@ function showProductsError(message) {
       <br>${message || "Failed to load products."}
       <br><button onclick="renderProducts(currentCategory)"
             style="margin-top:14px;padding:6px 18px;border:1px solid currentColor;
-                   background:none;cursor:pointer;font-size:12px;letter-spacing:1px;">
+                   background:none;cursor:pointer;font-size:14px;letter-spacing:1px;">
         Try again
       </button>
     </div>`;

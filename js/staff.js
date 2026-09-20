@@ -975,7 +975,7 @@ async function renderInventory() {
           <tr>
             <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(item.product_name)}</td>
             <td>${escapeHtml(item.size || "—")}</td>
-            <td><code style="font-size:12px">${escapeHtml(item.sku || "—")}</code></td>
+            <td><code style="font-size:13px">${escapeHtml(item.sku || "—")}</code></td>
             <td>${escapeHtml(item.category || "—")}</td>
             <td style="color:${isOut ? "var(--red)" : isLow ? "var(--gold)" : "var(--brown-300)"}">${qty}</td>
             <td>${statusBadge(status)}</td>
@@ -1141,7 +1141,7 @@ async function viewContactMessage(id) {
     overlay.id = "_msg-overlay";
     overlay.style.cssText =
       "position:fixed;inset:0;background:rgba(28,17,9,.45);z-index:9000;display:flex;align-items:center;justify-content:center";
-    overlay.innerHTML = `<div style="background:#fff;border-radius:4px;padding:28px 32px;max-width:520px;width:90%"><div style="font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--brown-100);margin-bottom:6px">Contact Message</div><div style="font-weight:500;font-size:16px;margin-bottom:4px">${escapeHtml(m.subject)}</div><div style="color:var(--brown-200);font-size:13px;margin-bottom:14px">${escapeHtml(m.name)} &lt;${escapeHtml(m.email)}&gt;</div><div style="font-size:13.5px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${escapeHtml(m.message)}</div><div style="margin-top:20px;text-align:right"><button onclick="document.getElementById('_msg-overlay').remove()" style="background:var(--brown-400);color:#fff;border:none;border-radius:4px;padding:8px 18px;cursor:pointer">Close</button></div></div>`;
+    overlay.innerHTML = `<div style="background:#fff;border-radius:4px;padding:28px 32px;max-width:520px;width:90%"><div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brown-100);margin-bottom:6px">Contact Message</div><div style="font-weight:500;font-size:17px;margin-bottom:4px">${escapeHtml(m.subject)}</div><div style="color:var(--brown-200);font-size:14px;margin-bottom:14px">${escapeHtml(m.name)} &lt;${escapeHtml(m.email)}&gt;</div><div style="font-size:15px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${escapeHtml(m.message)}</div><div style="margin-top:20px;text-align:right"><button onclick="document.getElementById('_msg-overlay').remove()" style="background:var(--brown-400);color:#fff;border:none;border-radius:4px;padding:8px 18px;cursor:pointer">Close</button></div></div>`;
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) overlay.remove();
     });
@@ -1224,12 +1224,12 @@ const baseOptions = {
   scales: {
     x: {
       grid: { display: false },
-      ticks: { color: "#b8a090", font: { size: 11 } },
+      ticks: { color: "#b8a090", font: { size: 12 } },
       border: { display: false },
     },
     y: {
       grid: { color: "rgba(230,221,210,0.6)" },
-      ticks: { color: "#b8a090", font: { size: 11 } },
+      ticks: { color: "#b8a090", font: { size: 12 } },
       border: { display: false },
     },
   },

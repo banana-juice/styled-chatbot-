@@ -43,13 +43,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 600;
   flex-shrink: 0;
 }
 
 .os-hello {
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--text-muted);
@@ -58,7 +59,8 @@
 
 .os-name {
   font-family: var(--serif);
-  font-size: 24px;
+  font-size: 28px;
+  font-weight: 600;
   line-height: 1.1;
   color: var(--text-main);
 }
@@ -76,6 +78,7 @@
   gap: 16px;
   padding: 20px 32px;
   font-size: 14px;
+  font-weight: 500;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -102,7 +105,7 @@
 .os-nav-item.active {
   background: var(--brown-dark);
   color: #f5ede4;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .os-nav-item.active svg {
@@ -118,7 +121,8 @@
   background: transparent;
   border: 1px solid var(--border);
 
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 2px;
   text-transform: uppercase;
 
@@ -142,7 +146,8 @@
 }
 
 .om-eyebrow {
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 3px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -152,7 +157,7 @@
 .om-title {
   font-family: var(--serif);
   font-size: clamp(36px, 4vw, 56px);
-  font-weight: 300;
+  font-weight: 400;
   line-height: 1.05;
   margin-bottom: 40px;
   color: var(--text-main);
@@ -225,33 +230,34 @@
 }
 
 .order-num {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
   color: var(--text-main);
   letter-spacing: 0.3px;
   margin-bottom: 6px;
 }
 
 .order-meta {
-  font-size: 13px;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text-muted);
   letter-spacing: 0.3px;
 }
 
 .order-price {
-  font-size: 14px;
-  font-weight: 400;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--text-main);
   white-space: nowrap;
 }
 
 .order-status {
-  font-size: 10px;
+  font-size: 12px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 6px 14px;
   border-radius: 2px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 
@@ -314,13 +320,14 @@
 }
 
 .oe-title {
-  font-size: 15px;
+  font-size: 18px;
   color: var(--text-muted);
   letter-spacing: 0.3px;
 }
 
 .oe-cta {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-main);
@@ -341,7 +348,8 @@
   border: 1px solid var(--border);
   padding: 14px 40px;
   font-family: var(--sans);
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 600;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -364,7 +372,8 @@
   background: none;
   border: none;
   font-family: var(--sans);
-  font-size: 12px;
+  font-size: 14px;
+  font-weight: 500;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -392,12 +401,12 @@
 }
 
 .od-status-badge {
-  font-size: 11px;
+  font-size: 13px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   padding: 9px 18px;
   border-radius: 2px;
-  font-weight: 500;
+  font-weight: 600;
   margin-top: 16px;
   flex-shrink: 0;
 }
@@ -421,7 +430,8 @@
 }
 
 .od-meta-label {
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -429,8 +439,8 @@
 }
 
 .od-meta-val {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 17px;
+  font-weight: 600;
   color: var(--text-main);
 }
 
@@ -439,7 +449,8 @@
 }
 
 .od-section-title {
-  font-size: 10px;
+  font-size: 12px;
+  font-weight: 600;
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -523,7 +534,8 @@
 }
 
 .ts-label {
-  font-size: 11px;
+  font-size: 13px;
+  font-weight: 500;
   letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -540,7 +552,7 @@
 }
 
 .ts-date {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   margin-top: 3px;
   text-align: center;
@@ -583,13 +595,14 @@
 }
 
 .od-item-name {
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--text-main);
   margin-bottom: 5px;
 }
 
 .od-item-meta {
-  font-size: 13px;
+  font-size: 15px;
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -607,7 +620,8 @@
 }
 
 .od-item-price {
-  font-size: 14px;
+  font-size: 17px;
+  font-weight: 500;
   color: var(--text-main);
   white-space: nowrap;
 }
@@ -622,7 +636,7 @@
 }
 
 .od-address {
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
   line-height: 2;
 }
@@ -630,7 +644,7 @@
 .od-total-row {
   display: flex;
   justify-content: space-between;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-muted);
   padding: 10px 0;
   border-bottom: 1px solid var(--border);
@@ -644,8 +658,8 @@
 }
 
 .od-total-grand {
-  font-size: 15px;
-  font-weight: 500;
+  font-size: 19px;
+  font-weight: 600;
   padding-top: 14px;
 }
 
@@ -671,8 +685,8 @@
 
 .ts-meta-label {
   font-family: "Jost", sans-serif;
-  font-size: 0.7rem;
-  font-weight: 500;
+  font-size: 0.8rem;
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: #8c6d57;
@@ -680,8 +694,8 @@
 
 .ts-meta-item strong {
   font-family: "Jost", sans-serif;
-  font-size: 0.875rem;
-  font-weight: 400;
+  font-size: 1rem;
+  font-weight: 500;
   color: #2c1f14;
   letter-spacing: 0.03em;
 }
