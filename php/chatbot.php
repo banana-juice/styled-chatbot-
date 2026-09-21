@@ -10,6 +10,21 @@ require_once __DIR__ . '/config/env.php';
 
 loadEnv();
 
+// Failure reporting that stays safe on a public site but is useful in dev.
+// `code` is always returned. `detail` (the underlying cURL/API/config message,
+// never the key itself) is only returned when the request comes from the local
+// machine, so a teammate debugging on localhost sees exactly what went wrong
+// while a deployed site keeps giving customers a generic message.
+function chatFail(int $status, string $publicMessage, string $code, string $detail = ''): void {
+    http_response_code($status);
+    $out = ['success' => false, 'error' => $publicMessage, 'code' => $code];
+    if ($detail !== '' && in_array($_SERVER['REMOTE_ADDR'] ?? '', ['127.0.0.1', '::1'], true)) {
+        $out['detail'] = $detail;
+    }
+    echo json_encode($out);
+    exit;
+}
+
 // ── 1. Auth check — mirrors php/orders.php ──────────────────────────────────
 if (empty($_SESSION['user_id'])) {
     http_response_code(401);
@@ -216,9 +231,13 @@ PROMPT;
 $apiKey = getenv('ANTHROPIC_API_KEY');
 if (!$apiKey) {
     error_log('chatbot.php: ANTHROPIC_API_KEY is not set.');
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Chat support is temporarily unavailable. Please try again later.']);
-    exit;
+    chatFail(500, 'Chat support is temporarily unavailable. Please try again later.', 'no_api_key',
+        'ANTHROPIC_API_KEY is not set. Copy .env.example to .env in the project root and add your key.');
+}
+if (!function_exists('curl_init')) {
+    error_log('chatbot.php: the PHP curl extension is not enabled.');
+    chatFail(500, 'Chat support is temporarily unavailable. Please try again later.', 'no_curl',
+        'The PHP curl extension is disabled. In php.ini remove the leading ; from extension=curl, then restart Apache.');
 }
 
 $messages   = $history;
@@ -251,18 +270,16 @@ curl_close($ch);
 
 if ($response === false) {
     error_log('chatbot.php: cURL error calling Anthropic API: ' . $curlError);
-    http_response_code(502);
-    echo json_encode(['success' => false, 'error' => 'Could not reach support chat right now. Please try again.']);
-    exit;
+    chatFail(502, 'Could not reach support chat right now. Please try again.', 'network', $curlError);
 }
 
 $result = json_decode($response, true);
 
 if ($httpCode !== 200 || !is_array($result)) {
     error_log('chatbot.php: Anthropic API returned HTTP ' . $httpCode . ': ' . $response);
-    http_response_code(502);
-    echo json_encode(['success' => false, 'error' => 'Support chat had trouble responding. Please try again.']);
-    exit;
+    $apiMessage = is_array($result) ? (string) ($result['error']['message'] ?? '') : '';
+    chatFail(502, 'Support chat had trouble responding. Please try again.', 'api_error',
+        'HTTP ' . $httpCode . ($apiMessage !== '' ? ': ' . $apiMessage : ': ' . substr((string) $response, 0, 200)));
 }
 
 // ── 6. Extract the reply text ────────────────────────────────────────────────
@@ -275,9 +292,8 @@ foreach ($result['content'] ?? [] as $block) {
 
 if ($reply === '') {
     error_log('chatbot.php: Anthropic API response had no text content: ' . $response);
-    http_response_code(502);
-    echo json_encode(['success' => false, 'error' => 'Support chat had trouble responding. Please try again.']);
-    exit;
+    chatFail(502, 'Support chat had trouble responding. Please try again.', 'empty_reply',
+        'The API returned no text content (stop_reason: ' . ($result['stop_reason'] ?? 'unknown') . ').');
 }
 
 echo json_encode(['success' => true, 'reply' => $reply]);

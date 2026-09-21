@@ -180,6 +180,9 @@
       if (data.success) {
         appendMessage("assistant", data.reply, true);
       } else {
+        // For developers: `code` says what failed, and `detail` (localhost
+        // only) says why. Customers just see the friendly message.
+        console.warn("[chatbot]", data.code || "error", data.detail || "");
         appendMessage(
           "assistant",
           data.error || "Sorry, something went wrong. Please try again in a moment.",
@@ -187,6 +190,7 @@
         );
       }
     } catch (err) {
+      console.error("[chatbot] request failed or returned non-JSON:", err);
       typingEl.remove();
       appendMessage(
         "assistant",
