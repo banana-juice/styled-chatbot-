@@ -4,7 +4,6 @@ const CATEGORIES = {
   tops: {
     label: "Category: Tops",
     displayName: "Tops",
-    colors: ["#6b3a2a", "#1c1c1c", "#c9b99a"],
     products: [
       {
         name: "Mocha Wrap Tank",
@@ -81,7 +80,6 @@ const CATEGORIES = {
   bottoms: {
     label: "Category: Bottoms",
     displayName: "Bottoms",
-    colors: ["#3d2b1f", "#8c6d57", "#e8ddd0"],
     products: [
       {
         name: "Midnight Lounge Shorts",
@@ -158,7 +156,6 @@ const CATEGORIES = {
   dresses: {
     label: "Category: Dresses",
     displayName: "Dresses",
-    colors: ["#5c3d2e", "#c9b99a", "#1e1510"],
     products: [
       {
         name: "Rosy Gingham Dress",
@@ -235,7 +232,6 @@ const CATEGORIES = {
   outerwear: {
     label: "Category: Outerwear",
     displayName: "Outerwear",
-    colors: ["#2c1f14", "#7a6a5a", "#c9b99a"],
     products: [
       {
         name: "Two-Tone Bomber",
@@ -312,7 +308,6 @@ const CATEGORIES = {
   accessories: {
     label: "Category: Accessories",
     displayName: "Accessories",
-    colors: ["#8c6d57", "#2c1f14", "#f5f0ea"],
     products: [
       {
         name: "Beaded Ocean Necklace",
@@ -468,7 +463,6 @@ function normaliseProduct(p) {
     category: p.category,
     category_name: p.category_name,
     sizes: p.sizes || ["XS", "S", "M", "L", "XL"],
-    colors: p.colors || ["#2c1f14", "#7a6a5a", "#c9b99a"],
     stock: p.stock || {},
   };
 }
@@ -1234,8 +1228,6 @@ function buildProductModal() {
         <div class="pm-stars">★★★★★ <span class="pm-reviews">(99 Reviews)</span></div>
         <p class="pm-price" id="pm-price"></p>
         <p class="pm-desc" id="pm-desc"></p>
-        <div class="pm-section-label">COLORS</div>
-        <div class="pm-colors" id="pm-colors"></div>
         <div class="pm-section-label">SIZE</div>
         <div class="pm-sizes" id="pm-sizes">
           <button class="pm-size" data-size="S">S</button>
@@ -1373,10 +1365,6 @@ const NO_SIZE_CATEGORIES = new Set(["accessories"]);
 function openProductModal(product, categoryKey) {
   buildProductModal();
   const catData = CATEGORIES[categoryKey] || {};
-  // Prefer colors from the product itself (API supplies per-product colors),
-  // fall back to the static category palette.
-  const colors = product.colors ||
-    catData.colors || ["#2c1f14", "#7a6a5a", "#c9b99a"];
 
   const hasSize = !NO_SIZE_CATEGORIES.has(categoryKey);
 
@@ -1389,14 +1377,6 @@ function openProductModal(product, categoryKey) {
     "A beautifully crafted piece designed for the modern wardrobe.";
   document.getElementById("pm-category").textContent =
     catData.displayName || "";
-
-  const colorsEl = document.getElementById("pm-colors");
-  colorsEl.innerHTML = colors
-    .map(
-      (c, i) =>
-        `<span class="pm-color-dot ${i === 0 ? "active" : ""}" style="background:${c}"></span>`,
-    )
-    .join("");
 
   // Show or hide the SIZE label + buttons depending on category
   const sizesEl = document.getElementById("pm-sizes");

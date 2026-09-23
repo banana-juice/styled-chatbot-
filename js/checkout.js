@@ -137,7 +137,7 @@ async function renderCart() {
       : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><div class="item-cell"><div class="item-thumb-placeholder"><img class="item-thumb" src="${item.img}" alt="${item.name}" onerror="this.style.display='none'" style="width:56px;height:64px;object-fit:cover;" /></div><div><p class="item-name">${item.name}</p><p class="item-meta"><span class="item-color-swatch" style="background:${item.color}"></span>${item.category || ""}${sizeLabel}</p></div></div></td>
+      <td><div class="item-cell"><div class="item-thumb-placeholder"><img class="item-thumb" src="${item.img}" alt="${item.name}" onerror="this.style.display='none'" style="width:56px;height:64px;object-fit:cover;" /></div><div><p class="item-name">${item.name}</p><p class="item-meta">${item.category || ""}${sizeLabel}</p></div></div></td>
       <td><div class="qty-control"><button class="qty-btn" data-idx="${idx}" data-delta="-1">−</button><span class="qty-num">${qty}</span><button class="qty-btn" data-idx="${idx}" data-delta="1">+</button></div></td>
       <td>${formatPrice(unitPrice)}</td>
       <td>${formatPrice(lineTotal)}</td>

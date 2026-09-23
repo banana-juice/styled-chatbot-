@@ -404,19 +404,6 @@ body {
   color: var(--text-main);
   margin-bottom: 8px;
 }
-.color-dots {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 8px;
-}
-.color-dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  cursor: default;
-  pointer-events: none;
-}
 .btn-cart {
   width: 100%;
   background: transparent;

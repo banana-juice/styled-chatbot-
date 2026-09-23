@@ -1074,22 +1074,6 @@ footer {
   color: var(--text-muted);
   margin-top: 4px;
 }
-.pm-colors {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.pm-color-dot {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  cursor: default; /* no pointer cursor */
-  pointer-events: none; /* completely non-clickable */
-  outline: 1px solid var(--border);
-}
-
 .pm-sizes {
   display: flex;
   gap: 8px;

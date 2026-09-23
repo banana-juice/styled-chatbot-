@@ -147,7 +147,6 @@ async function renderProducts(cat) {
     products = staticCat.products.map((p) => ({
       ...p,
       img: p.img,
-      colors: staticCat.colors,
     }));
   }
 
@@ -162,8 +161,6 @@ async function renderProducts(cat) {
     return;
   }
 
-  const colors = staticCat?.colors || ["#2c1f14", "#7a6a5a", "#c9b99a"];
-
   grid.innerHTML = filtered
     .map((p) => {
       const imgSrc = p.primary_image || p.img || p.image || "";
@@ -177,8 +174,6 @@ async function renderProducts(cat) {
       ) {
         formattedPrice = `₱${parseFloat(formattedPrice).toFixed(2)}`;
       }
-      const dotColors = p.colors || colors;
-
       return `
        <div class="product-card" data-product-id="${p.product_id}" data-product-name="${p.name.replace(/"/g, "&quot;")}" data-category="${cat}">
           <div class="product-img-wrap">
@@ -191,9 +186,6 @@ async function renderProducts(cat) {
           </div>
           <p class="product-name">${p.name}</p>
           <p class="product-price">${formattedPrice}</p>
-          <div class="color-dots">
-            ${dotColors.map((c) => `<span class="color-dot" style="background:${c}"></span>`).join("")}
-          </div>
           <button class="btn-cart" data-product-id="${p.product_id}" data-product-category="${cat}" data-product='${JSON.stringify({ ...p, price: formattedPrice }).replace(/'/g, "&#39;")}'>
             <svg class="cart-btn-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" fill="currentColor"/><line x1="3" y1="6" x2="21" y2="6" stroke="white" stroke-width="1.5"/><path d="M16 10a4 4 0 0 1-8 0" fill="none" stroke="white" stroke-width="1.5"/></svg>
             Add to Cart
@@ -247,7 +239,6 @@ async function renderProducts(cat) {
               prod.primary_image ||
               "",
             description: prod.description,
-            colors: ["#2c1f14", "#7a6a5a", "#c9b99a"],
           };
           openProductModal(modalProduct, data.product.category_slug);
         } else {
@@ -299,7 +290,6 @@ async function renderProducts(cat) {
               prod.primary_image ||
               "",
             description: prod.description,
-            colors: ["#2c1f14", "#7a6a5a", "#c9b99a"],
           };
           openProductModal(modalProduct, category);
         } else {

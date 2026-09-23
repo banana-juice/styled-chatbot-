@@ -174,16 +174,6 @@
   margin-bottom: 3px;
 }
 
-.item-color-swatch {
-  display: inline-block;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  vertical-align: middle;
-  margin-right: 4px;
-}
-
 .item-meta {
   font-size: 14px;
   color: var(--text-muted);
