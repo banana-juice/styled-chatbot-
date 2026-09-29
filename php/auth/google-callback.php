@@ -37,7 +37,9 @@ function jwt_payload(string $jwt): ?array {
 }
 
 // ── 0. Config sanity ─────────────────────────────────────────
-if (strpos(GOOGLE_CLIENT_ID, 'PASTE_YOUR') === 0) {
+// Same real placeholder value as google-start.php's guard - see the
+// comment there.
+if (GOOGLE_CLIENT_ID === 'GOOGLE_CLIENT_ID' || GOOGLE_CLIENT_ID === '') {
     oauth_fail('config', 'google_oauth.php still has placeholder credentials');
 }
 

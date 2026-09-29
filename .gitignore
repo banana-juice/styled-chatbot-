@@ -2,3 +2,4 @@
 *.log
 brevo_debug.txt
 paymongo_webhook_debug.log
+oauth_debug.txt

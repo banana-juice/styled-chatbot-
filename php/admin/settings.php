@@ -10,15 +10,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/../../php/db.php';
 
 header('Content-Type: application/json');
 
-// ── Simple session/auth guard (mirror the pattern used by other admin files) ──
-// If your other admin PHP files check a session, replicate that here.
-// For now we just ensure the request is coming from the same origin.
-// Replace this block with your actual auth check if needed.
-// session_start(); if (empty($_SESSION['admin_id'])) { http_response_code(401); echo json_encode(['success'=>false,'error'=>'Unauthorised']); exit; }
+// This file previously had its auth check commented out with a
+// "replace this if needed" placeholder — meaning ANY unauthenticated
+// request could read every store setting and, via POST, rewrite any of
+// them (shipping fee, VAT rate, payment methods, store email...) with
+// no login at all. Reproduced live during QA: an anonymous curl POST
+// changed the real shipping fee to 99999. Read access is left open to
+// any logged-in admin/staff (matches other admin/*.php GETs); writes
+// are restricted to admin only, since changing site-wide financial
+// settings is the same tier of action as cancel/refund elsewhere.
+requireAuth();
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    requireAuth('admin');
+}
 
 $method = $_SERVER['REQUEST_METHOD'];
 

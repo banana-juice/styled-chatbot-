@@ -235,6 +235,17 @@ async function handleSignup(e) {
     );
 
     if (success && data.success) {
+      if (data.email_sent === false) {
+        toast(
+          "Account created, but we couldn't send your verification email. Use Resend on the next page, or contact support if it keeps failing.",
+          "error",
+        );
+        setTimeout(() => {
+          window.location.href =
+            "verify-email.html?email=" + encodeURIComponent(email);
+        }, 2500);
+        return;
+      }
       window.location.href =
         "verify-email.html?email=" + encodeURIComponent(email);
     } else {

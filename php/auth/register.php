@@ -1,6 +1,6 @@
 <?php
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 header("Access-Control-Allow-Origin: https://styled.great-site.net");
@@ -86,5 +86,14 @@ $htmlBody = "
 $textBody = "Your Styled verification code is: {$code}. It expires in 15 minutes.";
 $result = sendEmailViaBrevo($email, $full_name, $subject, $htmlBody, $textBody);
 
+// The account is created either way — don't block signup over email
+// delivery. But the previous version ignored $result entirely and always
+// told the frontend "success", even when the email never sent, which left
+// a customer on verify-email.html with a code that would never arrive and
+// no indication anything was wrong. Surface it instead.
+if (!$result['success']) {
+    error_log('register.php: verification email failed to send to ' . $email . ': ' . ($result['error'] ?? 'unknown error'));
+}
+
 http_response_code(201);
-echo json_encode(['success' => true]);
+echo json_encode(['success' => true, 'email_sent' => $result['success']]);

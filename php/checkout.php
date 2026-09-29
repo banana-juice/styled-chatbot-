@@ -135,7 +135,34 @@ try {
         $subtotal += $item['unit_price'] * $item['qty'];
     }
 
-    $shipping_fee = $subtotal >= 1000 ? 0.0 : 150.0;
+    // ── Shipping + tax, read from the same settings the frontend uses ───────
+    // This used to be hardcoded here (free over ₱1000, else a flat ₱150,
+    // no tax at all) while js/checkout.js's updateTotals() correctly read
+    // the real settings (free over ₱500, ₱100 flat, +12% VAT) to compute
+    // what it showed the customer on the confirmation screen. The two
+    // never matched — verified live: a ₱310 order displayed as ₱447.20
+    // but saved to the database as ₱460.00. Reading the same settings
+    // here, with the same formula as updateTotals(), keeps what gets
+    // charged equal to what the customer actually saw and approved.
+    $settingsStmt = $pdo->query(
+        "SELECT `group`, `key`, value FROM settings
+         WHERE (`group`, `key`) IN (
+            ('shipping', 'shipping-free-threshold'), ('shipping', 'shipping-standard-fee'),
+            ('tax', 'tax-vat-rate')
+         )"
+    );
+    $settingsMap = [];
+    foreach ($settingsStmt->fetchAll() as $row) {
+        $settingsMap[$row['group'] . '.' . $row['key']] = $row['value'];
+    }
+    $freeShippingThreshold = isset($settingsMap['shipping.shipping-free-threshold'])
+        ? (float) $settingsMap['shipping.shipping-free-threshold'] : 1000.0;
+    $standardShippingFee = isset($settingsMap['shipping.shipping-standard-fee'])
+        ? (float) $settingsMap['shipping.shipping-standard-fee'] : 150.0;
+    $taxRatePercent = isset($settingsMap['tax.tax-vat-rate'])
+        ? (float) $settingsMap['tax.tax-vat-rate'] : 0.0;
+
+    $shipping_fee = $subtotal >= $freeShippingThreshold ? 0.0 : $standardShippingFee;
 
     // ── Promo validation and discount calculation ───────────────────────────
     $promo_id = null;
@@ -165,8 +192,12 @@ try {
         }
     }
 
-    // ── Final grand total after discount ────────────────────────────────────
-    $grand_total = round($subtotal - $discount_amount + $shipping_fee, 2);
+    // ── Final grand total: subtotal - discount + shipping + tax ─────────────
+    // Identical formula to updateTotals() in js/checkout.js: tax applies to
+    // the discounted subtotal, not the pre-discount one.
+    $taxable_amount = max(0.0, $subtotal - $discount_amount);
+    $tax_amount     = round($taxable_amount * ($taxRatePercent / 100), 2);
+    $grand_total    = round($subtotal - $discount_amount + $shipping_fee + $tax_amount, 2);
 
     $pdo->beginTransaction();
 

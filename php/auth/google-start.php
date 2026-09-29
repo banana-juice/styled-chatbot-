@@ -5,7 +5,11 @@ session_start();
 require_once __DIR__ . '/../config/google_oauth.php';
 
 // ── Guard: config not filled in yet ──────────────────────────
-if (strpos(GOOGLE_CLIENT_ID, 'PASTE_YOUR') === 0) {
+// GOOGLE_CLIENT_ID falls back to the literal string 'GOOGLE_CLIENT_ID'
+// (see php/config/google_oauth.php) when GOOGLE_CLIENT_ID isn't set in
+// .env — that's the actual placeholder value to check for, not
+// 'PASTE_YOUR...', which this file never contained.
+if (GOOGLE_CLIENT_ID === 'GOOGLE_CLIENT_ID' || GOOGLE_CLIENT_ID === '') {
     header('Location: ' . GOOGLE_RETURN_PAGE . '?oauth_error=config');
     exit;
 }
