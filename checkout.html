@@ -233,44 +233,31 @@
             </button>
           </div>
 
-          <!-- Card fields -->
+          <!-- Card / GCash / Maya: handled entirely on PayMongo's secure,
+               PCI-compliant hosted payment page. STYLED never collects or
+               stores card numbers, CVVs, or GCash credentials. -->
           <div id="payment-panel-card">
-            <div class="form-field">
-              <input
-                type="text"
-                id="co-card"
-                placeholder="Card Number"
-                maxlength="19"
-              />
-            </div>
-            <div class="form-row">
-              <div class="form-field">
-                <input
-                  type="text"
-                  id="co-expiry"
-                  placeholder="MM / YY"
-                  maxlength="7"
-                />
-              </div>
-              <div class="form-field">
-                <input
-                  type="text"
-                  id="co-cvv"
-                  placeholder="CVV"
-                  maxlength="3"
-                />
-              </div>
-            </div>
-            <div class="form-field">
-              <input
-                type="text"
-                id="co-cardholder"
-                placeholder="Name on Card"
-              />
+            <div class="gcash-info">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="1.7"
+              >
+                <rect x="1" y="4" width="22" height="16" rx="2" />
+                <line x1="1" y1="10" x2="23" y2="10" />
+              </svg>
+              <p>
+                You'll be redirected to PayMongo's secure payment page to
+                enter your card details. Styled never sees or stores your
+                card number.
+              </p>
             </div>
           </div>
 
-          <!-- GCash fields -->
+          <!-- GCash / Maya: same PayMongo-hosted redirect flow -->
           <div id="payment-panel-gcash" style="display: none">
             <div class="gcash-info">
               <svg
@@ -285,17 +272,10 @@
                 <line x1="12" y1="18" x2="12.01" y2="18" />
               </svg>
               <p>
-                Enter your registered GCash mobile number. You will receive a
-                payment prompt on your phone to complete the transaction.
+                You'll be redirected to PayMongo to complete payment via
+                GCash or Maya. You'll confirm the payment on your own
+                phone/app.
               </p>
-            </div>
-            <div class="form-field">
-              <input
-                type="tel"
-                id="co-gcash"
-                placeholder="GCash Mobile Number (e.g. 09XX XXX XXXX)"
-                maxlength="13"
-              />
             </div>
           </div>
 

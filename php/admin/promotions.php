@@ -1,11 +1,14 @@
 <?php
-// ============================================
-// PROMOTIONS API — php/admin/promotions.php
-// GET                  → list all (admin only)
-// POST {fields}        → create (admin only)
-// PUT  ?id=1 {fields}  → toggle active / update (admin only)
-// DELETE ?id=1         → delete (admin only)
-// ============================================
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';

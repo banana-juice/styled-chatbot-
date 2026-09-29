@@ -321,13 +321,8 @@ async function placeOrder() {
   ];
 
   const paymentRequired = {
-    card: [
-      { id: "co-card", label: "Card Number" },
-      { id: "co-expiry", label: "Expiry Date" },
-      { id: "co-cvv", label: "CVV" },
-      { id: "co-cardholder", label: "Name on Card" },
-    ],
-    gcash: [{ id: "co-gcash", label: "GCash Mobile Number" }],
+    card: [],
+    gcash: [],
     cod: [],
   };
 
@@ -349,15 +344,6 @@ async function placeOrder() {
   if (!email.includes("@") || !email.includes(".")) {
     alert("Please enter a valid email address.");
     return;
-  }
-
-  if (activePaymentMethod === "gcash") {
-    const gcash = document.getElementById("co-gcash").value.replace(/\s/g, "");
-    if (!/^09\d{9}$/.test(gcash)) {
-      alert("Please enter a valid GCash number (e.g. 09XX XXX XXXX).");
-      document.getElementById("co-gcash").focus();
-      return;
-    }
   }
 
   const items = cart.map((item) => ({
@@ -398,13 +384,44 @@ async function placeOrder() {
       return;
     }
 
-    document.getElementById("success-order-num").textContent =
-      "Order #" + data.order_number;
-    document.getElementById("success-overlay").classList.add("show");
+    // COD: no gateway involved, order is placed and confirmed as-is.
+    if (!data.requires_payment) {
+      document.getElementById("success-order-num").textContent =
+        "Order #" + data.order_number;
+      document.getElementById("success-overlay").classList.add("show");
 
-    appliedPromo = null;
+      appliedPromo = null;
+      await saveCart([]);
+      renderCart();
+      return;
+    }
+
+    // Card / GCash: the order exists but is "unpaid" until PayMongo
+    // confirms it. Ask our backend to open a PayMongo checkout session,
+    // then send the customer there to actually pay.
+    if (btn) btn.textContent = "Redirecting to secure payment…";
+
+    const payRes = await fetch(`${API_BASE}/php/create_payment.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_id: data.order_id }),
+    });
+    const payData = await payRes.json();
+
+    if (!payRes.ok || !payData.success || !payData.checkout_url) {
+      alert(
+        payData.error ||
+          "Could not start payment. Your order was saved — you can retry payment from Order History.",
+      );
+      appliedPromo = null;
+      await saveCart([]);
+      renderCart();
+      return;
+    }
+
     await saveCart([]);
-    renderCart();
+    window.location.href = payData.checkout_url;
   } catch (err) {
     console.error("placeOrder error:", err);
     alert(
@@ -436,13 +453,6 @@ document.querySelectorAll(".payment-tab").forEach((tab) => {
   });
 });
 
-const cardInput = document.getElementById("co-card");
-if (cardInput) cardInput.addEventListener("input", () => formatCard(cardInput));
-
-const expiryInput = document.getElementById("co-expiry");
-if (expiryInput)
-  expiryInput.addEventListener("input", () => formatExpiry(expiryInput));
-
 const promoBtn = document.getElementById("apply-promo-btn");
 if (promoBtn) promoBtn.addEventListener("click", applyPromo);
 
@@ -456,13 +466,18 @@ document.querySelector(".success-overlay")?.addEventListener("click", (e) => {
 
 initCheckout();
 
-// Helper functions
-function formatCard(input) {
-  let val = input.value.replace(/\D/g, "").substring(0, 16);
-  input.value = val.replace(/(.{4})/g, "$1 ").trim();
+// If the customer cancelled/backed out of PayMongo's hosted checkout,
+// they land back here with ?payment=cancelled — the order still exists
+// (as "unpaid"), so let them know they can retry from Order History
+// rather than silently losing track of it.
+const checkoutParams = new URLSearchParams(window.location.search);
+if (checkoutParams.get("payment") === "cancelled") {
+  const orderNum = checkoutParams.get("order");
+  showToast?.(
+    orderNum
+      ? `Payment for order #${orderNum} was cancelled. You can retry payment from Order History.`
+      : "Payment was cancelled.",
+    "error",
+  );
 }
-function formatExpiry(input) {
-  let val = input.value.replace(/\D/g, "").substring(0, 4);
-  if (val.length >= 3) val = val.substring(0, 2) + " / " + val.substring(2);
-  input.value = val;
-}
+

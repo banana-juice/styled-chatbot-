@@ -634,3 +634,275 @@ body {
 .toast.bad {
   background: var(--error);
 }
+
+/* Hide Edge/Chrome native password toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-textfield-decoration-container {
+  display: none;
+}
+
+/* ============================================
+   FORCE MOBILE LAYOUT FOR AUTH PAGES
+   ============================================ */
+
+@media (max-width: 800px) {
+  .auth-wrapper {
+    flex-direction: column !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  .auth-left {
+    width: 100% !important;
+    order: 2 !important;
+    padding: 24px 20px 48px !important;
+  }
+
+  .auth-right {
+    flex: none !important;
+    height: 240px !important;
+    order: 1 !important;
+  }
+
+  .auth-center {
+    max-width: 100% !important;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .tab-row {
+    max-width: 280px !important;
+    margin: 0 auto 20px !important;
+  }
+
+  .tab-btn {
+    font-size: 10px !important;
+    padding: 8px 0 !important;
+  }
+
+  .auth-form {
+    position: relative !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .auth-form.active {
+    transform: none !important;
+  }
+
+  .form-title {
+    font-size: 28px !important;
+    text-align: center;
+  }
+
+  .form-subtitle {
+    text-align: center;
+    font-size: 14px !important;
+  }
+
+  .field-wrap {
+    height: 46px !important;
+  }
+
+  .field-wrap input {
+    font-size: 14px !important;
+    padding: 10px 8px 10px 0 !important;
+  }
+
+  .fi svg {
+    width: 14px !important;
+    height: 14px !important;
+  }
+
+  .toggle-pw {
+    padding: 0 10px !important;
+  }
+
+  .pw-reqs {
+    padding: 8px 12px !important;
+    margin-top: 8px !important;
+  }
+
+  .pw-req {
+    font-size: 11px !important;
+  }
+
+  .btn-submit {
+    padding: 12px !important;
+    font-size: 11px !important;
+    margin-top: 8px;
+  }
+
+  .check-row {
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .switch-text {
+    font-size: 11px;
+  }
+
+  .modal-box {
+    width: 90%;
+    padding: 28px 20px;
+  }
+
+  .modal-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-left {
+    padding: 16px 16px 32px !important;
+  }
+  .auth-right {
+    height: 200px !important;
+  }
+  .auth-logo-img {
+    height: 45px;
+  }
+  .form-title {
+    font-size: 24px !important;
+  }
+  .form-subtitle {
+    font-size: 12px !important;
+  }
+  .field-wrap {
+    height: 42px !important;
+  }
+  .field-wrap input {
+    font-size: 13px !important;
+  }
+  .fi svg {
+    width: 12px !important;
+    height: 12px !important;
+  }
+  .toggle-pw {
+    padding: 0 6px !important;
+  }
+  .toggle-pw svg {
+    width: 14px;
+    height: 14px;
+  }
+  .pw-req {
+    font-size: 10px !important;
+  }
+  .btn-submit {
+    padding: 10px !important;
+    font-size: 10px !important;
+  }
+  .check-label {
+    font-size: 11px;
+  }
+  .forgot-link {
+    font-size: 11px;
+  }
+  .switch-text {
+    font-size: 10px;
+  }
+}
+/* ══════════════════════════════════════════════════════════════
+   NEW — SOCIAL LOGIN / OAUTH
+   Appended for the Google OAuth integration. Nothing above this
+   line was modified. Uses the existing :root tokens so the button
+   inherits the STYLED design language.
+   ══════════════════════════════════════════════════════════════ */
+
+/* ── "OR" divider ───────────────────────────────────────── */
+.oauth-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 2px 0 14px;
+  color: var(--text-muted);
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+}
+
+.oauth-divider::before,
+.oauth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.oauth-divider span {
+  flex-shrink: 0;
+}
+
+/* ── "Continue with Google" button ──────────────────────── */
+.btn-oauth {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--warm-white);
+  color: var(--text-main);
+  border: 1px solid var(--border);
+  padding: 12px 13px;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 2.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s,
+    transform 0.1s;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-oauth:hover:not(:disabled) {
+  background: #fff;
+  border-color: var(--brown-light);
+}
+
+.btn-oauth:active:not(:disabled) {
+  transform: scale(0.997);
+}
+
+.btn-oauth:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.oauth-icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.oauth-icon svg {
+  width: 17px;
+  height: 17px;
+  display: block;
+}
+
+.btn-oauth .oauth-icon,
+.btn-oauth .oauth-label {
+  transition: opacity 0.2s;
+}
+
+.btn-oauth.loading .oauth-icon,
+.btn-oauth.loading .oauth-label {
+  opacity: 0;
+}
+
+.btn-oauth.loading .btn-spin {
+  opacity: 1;
+}
+
+/* dark spinner variant so it is visible on the light button */
+.spin-ring.dark {
+  border: 2px solid rgba(44, 31, 20, 0.2);
+  border-top-color: var(--brown-dark);
+}

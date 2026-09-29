@@ -17,18 +17,23 @@ function initUserInfo() {
     return;
   }
   const nameEl = document.getElementById("os-name");
-  const avatarEl = document.getElementById("os-avatar"); // ← fixed
-  if (nameEl)
-    nameEl.innerHTML = `<em>${user.name?.split(" ")[0] || "there"}</em>`;
+  const avatarEl = document.getElementById("os-avatar");
+  if (nameEl) {
+    const fullName = user.full_name || user.name || "Guest";
+    nameEl.innerHTML = `<em>${fullName.split(" ")[0]}</em>`;
+  }
   if (avatarEl) {
-    avatarEl.textContent = user.name
-      ? user.name
-          .split(" ")
-          .map((w) => w[0])
-          .join("")
-          .toUpperCase()
-          .slice(0, 2)
-      : "?";
+    const fullName = user.full_name || user.name;
+    let initials = "?";
+    if (fullName) {
+      const nameParts = fullName.split(" ");
+      initials = nameParts
+        .map(part => part.charAt(0))
+        .join("")
+        .toUpperCase()
+        .slice(0, 2);
+    }
+    avatarEl.textContent = initials;
   }
 }
 
@@ -51,10 +56,7 @@ async function fetchOrders() {
 // ── FETCH SINGLE ORDER (full detail) ────────
 async function fetchOrder(orderId) {
   try {
-    const res = await fetch(
-      `php/orders.php?id=${encodeURIComponent(orderId)}`,
-      { credentials: "include" },
-    );
+    const res = await fetch(`php/orders.php?id=${encodeURIComponent(orderId)}`, { credentials: "include" });
     if (res.status === 401) {
       window.location.href = "auth.html";
       return null;
@@ -100,7 +102,7 @@ async function renderOrderList() {
           <p class="order-meta">${order.date} &bull; ${itemCount} item${itemCount !== 1 ? "s" : ""}</p>
         </div>
         <p class="order-price">${order.total}</p>
-        <span class="order-status ${getStatusClass(order.status)}">${order.status}</span>
+        <span class="order-status ${getStatusClass(order.status)}">${order.status}${order.payment_status === "unpaid" || order.payment_status === "failed" ? " · Unpaid" : ""}</span>
         <div class="order-arrow">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <polyline points="9 18 15 12 9 6"/>
@@ -111,11 +113,9 @@ async function renderOrderList() {
     })
     .join("");
 
-  // 🔧 FIX: Always fetch full order details – never use the list object
   document.querySelectorAll(".order-row").forEach((row) => {
     row.addEventListener("click", async () => {
       const orderId = row.dataset.orderId;
-      // Always fetch the full order from the server
       const fullOrder = await fetchOrder(orderId);
       if (fullOrder) {
         openOrderDetail(fullOrder);
@@ -125,36 +125,53 @@ async function renderOrderList() {
     });
   });
 }
-function buildTrackingFromStatus(status, orderDate) {
+
+function buildFallbackSteps(status) {
   const statusMap = {
-    Pending: 1,
-    Processing: 2,
-    Shipped: 3,
-    "Out for Delivery": 4,
-    Delivered: 5,
-    Cancelled: 1,
+    pending: 1,
+    processing: 2,
+    shipped: 3,
+    delivered: 5,
+    cancelled: 1,
   };
-  const stepLabels = [
-    "Order Placed",
-    "Processing",
-    "Shipped",
-    "Out for Delivery",
-    "Delivered",
-  ];
-  let doneCount = statusMap[status] || 1;
-  const steps = stepLabels.map((label, i) => {
-    let date = "—";
-    if (i === 0 && orderDate) date = orderDate;
-    return {
-      label: label,
-      date: date,
-      done: i + 1 <= doneCount,
-      active: i + 1 === doneCount && doneCount !== 5,
-    };
-  });
-  return { steps, tracking_number: null, estimated_delivery: null };
+  const doneCount = statusMap[(status || "pending").toLowerCase()] ?? 1;
+  const labels = ["Order Placed", "Processing", "Shipped", "Out for Delivery", "Delivered"];
+  return labels.map((label, i) => ({
+    label,
+    date: "—",
+    done: i + 1 <= doneCount,
+    active: i + 1 === doneCount && doneCount !== 5,
+  }));
 }
-// ── RENDER ORDER DETAIL (uses full API response) ──
+
+function renderTrackingStepper(trackingData) {
+  const stepper = document.getElementById("tracking-stepper");
+  if (!stepper) return;
+  const steps = trackingData.steps || [];
+  const trackingNumber = trackingData.tracking_number;
+  const estimatedDelivery = trackingData.estimated_delivery;
+
+  let activeIdx = -1;
+  steps.forEach((s, i) => {
+    if (s.done || s.active) activeIdx = i;
+  });
+
+  const stepsHTML = steps
+    .map((step, i) => {
+      const isDone = i < activeIdx;
+      const isActive = i === activeIdx;
+      const cls = isDone ? "ts-step done" : isActive ? "ts-step active" : "ts-step";
+      return `<div class="${cls}"><div class="ts-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><p class="ts-label">${step.label}</p><p class="ts-date">${step.date !== "—" ? step.date : ""}</p></div>`;
+    })
+    .join("");
+
+  let metaHTML = "";
+  if (trackingNumber || estimatedDelivery) {
+    metaHTML = `<div class="ts-meta-bar">${trackingNumber ? `<span class="ts-meta-item"><span class="ts-meta-label">Tracking #</span><strong>${trackingNumber}</strong></span>` : ""}${estimatedDelivery ? `<span class="ts-meta-item"><span class="ts-meta-label">Est. Delivery</span><strong>${estimatedDelivery}</strong></span>` : ""}</div>`;
+  }
+  stepper.innerHTML = metaHTML + stepsHTML;
+}
+
 function openOrderDetail(order) {
   document.getElementById("view-list").style.display = "none";
   document.getElementById("view-detail").style.display = "block";
@@ -167,31 +184,83 @@ function openOrderDetail(order) {
 
   document.getElementById("od-date").textContent = order.date;
   const itemCount = order.items?.length || 1;
-  document.getElementById("od-items-count").textContent =
-    `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
+  document.getElementById("od-items-count").textContent = `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
   document.getElementById("od-total").textContent = order.total;
 
-  const paymentEl = document.getElementById("od-payment");
-  if (paymentEl) paymentEl.textContent = order.payment || "—";
+  const paymentLabel = order.payment_status_display
+    ? `${order.payment || "—"} — ${order.payment_status_display}`
+    : order.payment || "—";
+  document.getElementById("od-payment").textContent = paymentLabel;
 
-  // Build tracking data from API response, not from status only
+  renderRetryPaymentButton(order);
+
+  let steps = order.tracking?.steps;
+  if (!steps || steps.length === 0) {
+    steps = buildFallbackSteps(order.status.toLowerCase());
+  }
   const trackingData = {
-    steps:
-      order.tracking?.steps || buildFallbackSteps(order.status.toLowerCase()),
+    steps: steps,
     tracking_number: order.tracking?.tracking_number || null,
     estimated_delivery: order.tracking?.estimated_delivery || null,
   };
   renderTrackingStepper(trackingData);
 
   renderOrderItems(order.items || []);
-  document.getElementById("od-address").innerHTML = (
-    order.shipping?.address || "—"
-  ).replace(/\n/g, "<br>");
-  document.getElementById("od-subtotal").textContent =
-    order.subtotal || "₱0.00";
-  document.getElementById("od-shipping").textContent =
-    order.shipping?.cost_display || "FREE";
+  document.getElementById("od-address").innerHTML = (order.shipping?.address || "—").replace(/\n/g, "<br>");
+  document.getElementById("od-subtotal").textContent = order.subtotal || "₱0.00";
+  document.getElementById("od-shipping").textContent = order.shipping?.cost_display || "FREE";
   document.getElementById("od-grand").textContent = order.total;
+}
+
+function renderRetryPaymentButton(order) {
+  // Remove any existing button first (re-render on every detail open).
+  document.getElementById("od-retry-payment-btn")?.remove();
+
+  const needsRetry =
+    order.payment_status === "unpaid" || order.payment_status === "failed";
+  if (!needsRetry || !order.order_id) return;
+
+  const paymentSection = document.getElementById("od-payment")?.closest("div");
+  if (!paymentSection) return;
+
+  const btn = document.createElement("button");
+  btn.id = "od-retry-payment-btn";
+  btn.className = "btn-primary";
+  btn.style.marginTop = "10px";
+  btn.style.fontSize = "12px";
+  btn.style.padding = "10px 20px";
+  btn.textContent =
+    order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    btn.textContent = "Redirecting…";
+    try {
+      const res = await fetch(`${API_BASE}/php/create_payment.php`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ order_id: order.order_id }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success || !data.checkout_url) {
+        alert(data.error || "Could not start payment. Please try again.");
+        btn.disabled = false;
+        btn.textContent =
+          order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+        return;
+      }
+      window.location.href = data.checkout_url;
+    } catch (err) {
+      console.error("retry payment error:", err);
+      alert("A network error occurred. Please try again.");
+      btn.disabled = false;
+      btn.textContent =
+        order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+    }
+  });
+
+  paymentSection.appendChild(btn);
 }
 
 function renderOrderItems(items) {
@@ -220,100 +289,24 @@ function renderOrderItems(items) {
     .join("");
 }
 
-function normaliseTracking(raw) {
-  if (!raw || !raw.steps || raw.steps.length === 0) {
-    return {
-      steps: buildFallbackSteps("pending"),
-      tracking_number: null,
-      estimated_delivery: null,
-    };
-  }
-  return raw;
-}
-
-function buildFallbackSteps(status) {
-  const statusMap = {
-    pending: 1,
-    processing: 2,
-    shipped: 3,
-    delivered: 5,
-    cancelled: 1,
-  };
-  const doneCount = statusMap[(status || "pending").toLowerCase()] ?? 1;
-  const labels = [
-    "Order Placed",
-    "Processing",
-    "Shipped",
-    "Out for Delivery",
-    "Delivered",
-  ];
-  return labels.map((label, i) => ({
-    label,
-    date: "—",
-    done: i + 1 <= doneCount,
-    active: i + 1 === doneCount && doneCount !== 5,
-  }));
-}
-
-function renderTrackingStepper(trackingData) {
-  const stepper = document.getElementById("tracking-stepper");
-  if (!stepper) return;
-  const steps = trackingData.steps || [];
-  const trackingNumber = trackingData.tracking_number;
-  const estimatedDelivery = trackingData.estimated_delivery;
-
-  // Find active step (last done or active)
-  let activeIdx = -1;
-  steps.forEach((s, i) => {
-    if (s.done || s.active) activeIdx = i;
-  });
-
-  const stepsHTML = steps
-    .map((step, i) => {
-      const isDone = i < activeIdx;
-      const isActive = i === activeIdx;
-      const cls = isDone
-        ? "ts-step done"
-        : isActive
-          ? "ts-step active"
-          : "ts-step";
-      return `<div class="${cls}"><div class="ts-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><p class="ts-label">${step.label}</p><p class="ts-date">${step.date !== "—" ? step.date : ""}</p></div>`;
-    })
-    .join("");
-
-  let metaHTML = "";
-  if (trackingNumber || estimatedDelivery) {
-    metaHTML = `<div class="ts-meta-bar">${trackingNumber ? `<span class="ts-meta-item"><span class="ts-meta-label">Tracking #</span><strong>${trackingNumber}</strong></span>` : ""}${estimatedDelivery ? `<span class="ts-meta-item"><span class="ts-meta-label">Est. Delivery</span><strong>${estimatedDelivery}</strong></span>` : ""}</div>`;
-  }
-  stepper.innerHTML = metaHTML + stepsHTML;
-}
-
-// ── BACK BUTTON ──────────────────────────────
 document.getElementById("back-btn")?.addEventListener("click", () => {
   document.getElementById("view-detail").style.display = "none";
   document.getElementById("view-list").style.display = "block";
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 
-// ── SIGN OUT ─────────────────────────────────
 function handleSignOut() {
-  fetch("/styled/php/auth/logout.php", {
-    method: "GET",
-    credentials: "include",
-  }).finally(() => {
+  fetch("/styled/php/auth/logout.php", { method: "GET", credentials: "include" }).finally(() => {
     localStorage.removeItem("styled_user");
     window.location.href = "auth.html";
   });
 }
 document.getElementById("os-signout")?.addEventListener("click", handleSignOut);
 
-// ── TABS ─────────────────────────────────────
 const tabOrders = document.getElementById("tab-orders");
 const tabWishlist = document.getElementById("tab-wishlist");
 function setActiveTab(activeEl) {
-  document
-    .querySelectorAll(".os-nav-item")
-    .forEach((el) => el.classList.remove("active"));
+  document.querySelectorAll(".os-nav-item").forEach((el) => el.classList.remove("active"));
   if (activeEl) activeEl.classList.add("active");
 }
 tabOrders?.addEventListener("click", (e) => {
@@ -333,4 +326,29 @@ window.initOrdersPage = function () {
   renderOrderList();
   setActiveTab(tabOrders);
   setTimeout(() => setActiveTab(document.getElementById("tab-orders")), 300);
+  handlePaymentReturnParams();
 };
+
+// PayMongo redirects the customer back here after checkout. success_url
+// includes ?payment=success&order=STY-...; cancel_url on checkout.html
+// includes ?payment=cancelled instead (see checkout.js). The actual
+// paid/failed status still comes from the webhook — this is just a
+// friendly landing message and a shortcut to the relevant order.
+async function handlePaymentReturnParams() {
+  const params = new URLSearchParams(window.location.search);
+  const paymentResult = params.get("payment");
+  const orderNumber = params.get("order");
+  if (!paymentResult) return;
+
+  if (paymentResult === "success" && orderNumber) {
+    showToast?.(
+      "Payment received! We're confirming it now — your order status will update shortly.",
+      "ok",
+    );
+    const fullOrder = await fetchOrder(orderNumber);
+    if (fullOrder) openOrderDetail(fullOrder);
+  }
+
+  // Clean the query string so a page refresh doesn't re-trigger this.
+  window.history.replaceState({}, "", window.location.pathname);
+}

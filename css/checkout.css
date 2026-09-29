@@ -561,3 +561,70 @@
   color: var(--text-muted);
   margin-bottom: 32px;
 }
+
+/* MOBILE FIXES - checkout.css */
+@media (max-width: 480px) {
+  .checkout-left, .checkout-right {
+    padding: 24px 16px;
+  }
+  .checkout-title {
+    font-size: 24px;
+  }
+  .order-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .order-table {
+    min-width: 480px;
+  }
+  .item-thumb, .item-thumb-placeholder {
+    width: 40px;
+    height: 48px;
+  }
+  .item-name {
+    font-size: 12px;
+  }
+  .item-meta {
+    font-size: 9px;
+  }
+  .qty-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+  .remove-btn {
+    font-size: 9px;
+  }
+  .total-row {
+    gap: 16px;
+    font-size: 12px;
+  }
+  .total-row span:last-child {
+    min-width: 50px;
+  }
+  .checkout-form .form-row {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .payment-tab {
+    padding: 10px 4px;
+    font-size: 9px;
+  }
+  .promo-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .promo-btn {
+    width: 100%;
+  }
+  .btn-place-order {
+    padding: 14px;
+    font-size: 10px;
+  }
+  .success-card {
+    padding: 32px 20px;
+  }
+  .success-title {
+    font-size: 24px;
+  }
+}

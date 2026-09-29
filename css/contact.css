@@ -203,3 +203,45 @@
 .success-msg.visible {
   opacity: 1;
 }
+
+/* MOBILE FIXES - contact.css */
+@media (max-width: 480px) {
+  .contact-left, .contact-right {
+    padding: 24px 16px;
+  }
+  .contact-title {
+    font-size: 28px;
+  }
+  .contact-desc {
+    font-size: 12px;
+  }
+  .contact-info-item {
+    gap: 10px;
+  }
+  .contact-info-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .contact-info-icon img {
+    width: 12px;
+    height: 12px;
+  }
+  .contact-info-label {
+    font-size: 10px;
+  }
+  .contact-info-val {
+    font-size: 11px;
+  }
+  .form-row {
+    gap: 12px;
+  }
+  .form-field input,
+  .form-field textarea {
+    padding: 12px 14px;
+    font-size: 12px;
+  }
+  .btn-send {
+    padding: 12px;
+    font-size: 10px;
+  }
+}

@@ -1,10 +1,14 @@
 <?php
-// ============================================
-// CUSTOMERS API — php/admin/customers.php
-// GET  ?page=1&search=bea   → list
-// GET  ?id=5                → single customer + order history
-// PUT  ?id=5  {admin_notes} → add note (admin + staff)
-// ============================================
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';
