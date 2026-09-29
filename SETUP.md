@@ -39,6 +39,17 @@ C:\xampp\mysql\bin\mysql.exe -u root --force styled_db < path\to\the-export.sql
 (an address pointing at a deleted user). Without it the import stops near the
 end; the data still loads, but the remaining constraints get skipped.
 
+**Then run this too, every time you import a fresh export:**
+
+```bash
+C:\xampp\mysql\bin\mysql.exe -u root styled_db < payment-columns-migration.sql
+```
+
+The payment gateway code expects three columns (`payment_status`,
+`payment_reference`, `paid_at`) that aren't in the export itself — without
+this, `Orders`/`My Orders` 500 with "Unknown column 'payment_status'". See
+[payment-columns-migration.sql](payment-columns-migration.sql) for why.
+
 [php/db.php](php/db.php) already matches XAMPP's defaults (`localhost`,
 `root`, no password), so no code change is needed locally.
 
@@ -92,16 +103,35 @@ the server:
 1. Upload the project to your PHP host (the live site is on InfinityFree).
    The chatbot needs `php/chatbot.php`, `php/config/env.php`, `js/chatbot.js`,
    `css/chatbot.css`, `.htaccess`, and the updated `*.html` files.
-2. On the server, create a file named `.env` in the site root containing
-   `ANTHROPIC_API_KEY=...` (use the host's File Manager). **Do not** get it
-   there through GitHub.
-3. On the host, `php/db.php` uses that host's own database name, user and
-   password, not the XAMPP defaults in this repo. Keep the server's copy.
-4. Confirm `https://your-site/.env` returns 403/404, not the file contents.
-5. Confirm the host allows outbound HTTPS calls from PHP (curl). Some free
+2. On the server, create a file named `.env` in the site root (use the
+   host's File Manager — **never** get it there through GitHub) with
+   whichever of these the site actually needs:
+   ```
+   ANTHROPIC_API_KEY=...
+   DB_HOST=...
+   DB_NAME=...
+   DB_USER=...
+   DB_PASS=...
+   PAYMONGO_SECRET_KEY=...
+   PAYMONGO_PUBLIC_KEY=...
+   PAYMONGO_WEBHOOK_SECRET=...
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   BREVO_API_KEY=...
+   ```
+   `php/db.php` and the other config files all read from `.env` first and
+   only fall back to local XAMPP defaults / harmless placeholders when a key
+   is missing — so the same `db.php` etc. works on every machine now; there's
+   no separate "server's copy" to maintain by hand.
+3. Confirm `https://your-site/.env` returns 403/404, not the file contents.
+4. Confirm the host allows outbound HTTPS calls from PHP (curl). Some free
    hosts restrict this; if `network` errors persist there, that's the cause.
-6. Set a spending limit on the key in the Anthropic console. Only logged-in
+5. Set a spending limit on the key in the Anthropic console. Only logged-in
    users can chat, but a public site should still cap what the key can spend.
+6. If Orders/My Orders 500 with "Unknown column 'payment_status'", the live
+   database needs the same three columns —
+   [payment-columns-migration.sql](payment-columns-migration.sql) — unless
+   it already has them.
 
 ## Day-to-day between machines
 
