@@ -1,11 +1,14 @@
 <?php
-// ============================================
-// USERS/STAFF API — php/admin/users.php
-// GET    ?role=staff          → list staff users (admin only)
-// POST   {full_name, email, role} → add staff (admin only)
-// PUT    ?id=1 {role, is_verified} → update (admin only)
-// DELETE ?id=1               → remove staff (admin only)
-// ============================================
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';

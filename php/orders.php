@@ -1,7 +1,14 @@
 <?php
-// ============================================
-// CUSTOMER ORDERS API — php/orders.php
-// ============================================
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 ini_set('display_errors', 0);
 error_reporting(E_ALL);
@@ -36,6 +43,7 @@ if (!empty($_GET['id'])) {
     $order_number = trim($_GET['id']);
     $stmt = $pdo->prepare("
         SELECT o.order_id, o.order_number, o.status, o.payment_method,
+               o.payment_status,
                o.grand_total AS total, o.created_at, o.tracking_number,
                a.street, a.city, a.province, a.zip_code
         FROM orders o
@@ -82,6 +90,16 @@ if (!empty($_GET['id'])) {
     $paymentDisplay = $paymentMap[strtolower($order['payment_method'])] ?? ucfirst($order['payment_method']);
     if (empty($paymentDisplay)) $paymentDisplay = '—';
 
+    $paymentStatusMap = [
+        'unpaid'     => 'Awaiting Payment',
+        'processing' => 'Payment Processing',
+        'paid'       => 'Paid',
+        'failed'     => 'Payment Failed',
+        'refunded'   => 'Refunded',
+        'cod'        => 'Pay on Delivery',
+    ];
+    $paymentStatusDisplay = $paymentStatusMap[$order['payment_status']] ?? ucfirst($order['payment_status']);
+
     $shippingFee = max(0, $order['total'] - $subtotal);
     $address = implode(', ', array_filter([$order['street'], $order['city'], $order['province'], $order['zip_code']]));
 
@@ -105,12 +123,15 @@ if (!empty($_GET['id'])) {
     }
 
     $orderData = [
+        'order_id' => $order['order_id'],
         'id' => $order['order_number'],
         'date' => date('M d, Y', strtotime($order['created_at'])),
         'total' => formatPrice($order['total']),
         'totalNum' => (float) $order['total'],
         'status' => ucfirst($order['status']),
         'payment' => $paymentDisplay,
+        'payment_status' => $order['payment_status'],
+        'payment_status_display' => $paymentStatusDisplay,
         'items' => $items,
         'shipping' => [
             'address' => $address ?: '—',
@@ -132,7 +153,7 @@ if (!empty($_GET['id'])) {
 
 // List orders
 $stmt = $pdo->prepare("
-    SELECT order_id, order_number, status, grand_total AS total, created_at
+    SELECT order_id, order_number, status, payment_method, payment_status, grand_total AS total, created_at
     FROM orders
     WHERE user_id = ?
     ORDER BY created_at DESC
@@ -158,10 +179,13 @@ foreach ($rows as $row) {
     $firstItem = $imgStmt->fetch();
 
     $orders[] = [
+        'order_id' => $row['order_id'],
         'id' => $row['order_number'],
         'date' => date('M d, Y', strtotime($row['created_at'])),
         'total' => formatPrice($row['total']),
         'status' => ucfirst($row['status']),
+        'payment_method' => $row['payment_method'],
+        'payment_status' => $row['payment_status'],
         'items' => $firstItem ? [$firstItem] : [],
     ];
 }

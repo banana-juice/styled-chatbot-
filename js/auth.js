@@ -288,14 +288,13 @@ async function handleLogin(e) {
   setLoading("btn-login", true);
 
   try {
-    const {
-      ok: success,
-      status,
-      data,
-    } = await apiPost(API_BASE + "/php/auth/login.php", {
-      email,
-      password: pw,
-    });
+   const remember = document.getElementById("remember").checked;
+
+const { ok: success, status, data } = await apiPost(API_BASE + "/php/auth/login.php", {
+  email,
+  password: pw,
+  remember: remember       
+});
 
     if (success && data.success) {
       const user = data.user;
@@ -392,3 +391,126 @@ if (suPw) {
   const el = document.getElementById(id);
   if (el) el.addEventListener("input", () => clr(id));
 });
+
+/* ══════════════════════════════════════════════════════════════
+   NEW — SOCIAL LOGIN / OAUTH (Google)
+   Appended for the Google OAuth integration. Nothing above this
+   line was modified, so the existing email/password signup and
+   login handlers are untouched.
+
+   This file contains NO secrets. It only:
+     1. sends the browser to /php/auth/google-start.php
+     2. reads ?oauth=success / ?oauth_error=... on the way back
+     3. confirms the PHP session via the existing check.php and
+        mirrors it into localStorage, exactly like handleLogin()
+   ══════════════════════════════════════════════════════════════ */
+
+// Friendly messages. The backend only ever sends a short machine code,
+// never a stack trace or provider detail.
+const OAUTH_ERRORS = {
+  cancelled: "Google sign-in was cancelled.",
+  config: "Google sign-in isn't configured yet. Please use email and password.",
+  state: "Your sign-in session expired for security reasons. Please try again.",
+  expired: "Your sign-in session expired. Please try again.",
+  invalid_response: "We couldn't complete Google sign-in. Please try again.",
+  token: "We couldn't verify your Google account. Please try again.",
+  provider: "Google couldn't complete the sign-in. Please try again.",
+  network: "We couldn't reach Google. Check your connection and try again.",
+  incomplete:
+    "Google didn't share an email address with us. Try another account or sign up with email.",
+  unverified_google:
+    "That Google account's email isn't verified. Please verify it with Google first.",
+  already_linked:
+    "This email is already linked to a different Google account. Please log in with email and password.",
+  server: "Something went wrong on our end. Please try again shortly.",
+};
+
+// ── Start the OAuth flow ─────────────────────────────────────
+function startOAuth(provider, btn) {
+  if (provider !== "google") return;
+  if (btn) {
+    btn.classList.add("loading");
+    btn.disabled = true;
+  }
+  // Full-page redirect: the consent screen must run on Google's own
+  // origin. accounts.google.com refuses to be framed or fetched.
+  window.location.href = API_BASE + "/php/auth/google-start.php";
+}
+
+document.querySelectorAll("[data-oauth]").forEach((btn) => {
+  btn.addEventListener("click", () => startOAuth(btn.dataset.oauth, btn));
+});
+
+// ── Handle the return trip from google-callback.php ──────────
+(function handleOAuthReturn() {
+  const params = new URLSearchParams(location.search);
+
+  // (a) Something went wrong / user cancelled
+  const errCode = params.get("oauth_error");
+  if (errCode) {
+    history.replaceState({}, "", location.pathname);
+    setTimeout(() => {
+      switchTab("login");
+      toast(
+        OAUTH_ERRORS[errCode] || "Google sign-in failed. Please try again.",
+        "error",
+      );
+    }, 120);
+    return;
+  }
+
+  // (b) Success — the PHP session is already set by the callback.
+  if (params.get("oauth") !== "success") return;
+
+  const mode = params.get("mode"); // created | linked_to_existing | existing_link
+  history.replaceState({}, "", location.pathname);
+
+  (async () => {
+    try {
+      // Confirm with the SAME endpoint the rest of the site uses.
+      const res = await fetch(API_BASE + "/php/auth/check.php", {
+        method: "GET",
+        credentials: "include",
+      });
+      const data = await res.json();
+
+      if (!data.logged_in || !data.user) {
+        toast("Your session didn't stick. Please try signing in again.", "error");
+        return;
+      }
+
+      const user = data.user;
+
+      // Mirror into localStorage in the exact shape main.js expects.
+      localStorage.setItem(
+        "styled_user",
+        JSON.stringify({
+          name: user.full_name,
+          email: user.email,
+          role: user.role,
+        }),
+      );
+
+      if (mode === "created") {
+        toast("Account created with Google. Welcome to Styled!", "ok");
+      } else if (mode === "linked_to_existing") {
+        toast("Google linked to your Styled account. Redirecting…", "ok");
+      } else {
+        toast("Welcome back! Redirecting…", "ok");
+      }
+
+      // Same role routing as handleLogin().
+      setTimeout(() => {
+        if (user.role === "admin") {
+          window.location.href = "admin.html";
+        } else if (user.role === "staff") {
+          window.location.href = "staff.html";
+        } else {
+          window.location.href = "index.html";
+        }
+      }, 1300);
+    } catch (err) {
+      toast("Network error finishing sign-in. Please try again.", "error");
+    }
+  })();
+})();

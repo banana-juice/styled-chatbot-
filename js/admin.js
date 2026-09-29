@@ -2,6 +2,7 @@
 
 console.log("renderAnalytics() called");
 
+let ordersPaymentFilter = "";   // empty = no filter (All)
 let currentVariants = [];
 
 // Make sure no direct DELETE calls are made
@@ -188,6 +189,21 @@ function statusBadge(s) {
   return `<span class="badge badge-${map[key] || "delivered"}">${s}</span>`;
 }
 
+// Real payment status label, backed by orders.payment_status (set by
+// checkout + confirmed by the PayMongo webhook) — not a guess from
+// payment_method like this used to be.
+function paymentStatusLabel(o) {
+  const map = {
+    paid: "Paid",
+    unpaid: "Unpaid",
+    processing: "Processing",
+    failed: "Failed",
+    refunded: "Refunded",
+    cod: "Pending", // cash collected on delivery, not yet in hand
+  };
+  return map[o.payment_status] || (o.payment_method === "cod" ? "Pending" : "Unpaid");
+}
+
 function initials(name) {
   return (name || "?")
     .split(" ")
@@ -268,7 +284,7 @@ async function renderDashboard() {
                         <td>${o.customer_name || "—"}</td>
                         <td class="text-muted">${new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
                         <td>${statusBadge(o.status)}</td>
-                        <td>${statusBadge(o.payment_method === "cod" ? "Pending" : "Paid")}</td>
+                        <td>${statusBadge(paymentStatusLabel(o))}</td>
                         <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
                         <td><button class="ellipsis-btn">···</button></td>
                     </tr>`,
@@ -371,12 +387,13 @@ const ORDERS_PER_PAGE = 8;
 
 async function renderOrdersTable() {
   tableLoading("orders-body", 7);
-  const params = new URLSearchParams({
-    page: ordersPage,
-    limit: ORDERS_PER_PAGE,
-    status: ordersStatusFilter,
-    search: ordersSearch,
-  });
+const params = new URLSearchParams({
+  page: ordersPage,
+  limit: ORDERS_PER_PAGE,
+  status: ordersStatusFilter,
+  search: ordersSearch,
+  payment_status: ordersPaymentFilter,   // <-- add this line
+});
   try {
     const data = await fetchJSON(`${API}/orders.php?${params}`);
     const body = document.getElementById("orders-body");
@@ -398,7 +415,7 @@ async function renderOrdersTable() {
           </td>
           <td class="text-muted">${new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
           <td>${statusBadge(o.status)}</td>
-          <td>${statusBadge(o.payment_method === "cod" ? "Pending" : "Paid")}</td>
+          <td>${statusBadge(paymentStatusLabel(o))}</td>
           <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
           <td><button class="ellipsis-btn">···</button></td>
         </td>`,
@@ -431,6 +448,12 @@ function filterOrdersByStatus(s) {
   renderOrdersTable();
 }
 
+function filterOrdersByPaymentStatus(status) {
+  ordersPaymentFilter = status;
+  ordersPage = 1;
+  renderOrdersTable();
+}
+
 function showOrdersList() {
   document.getElementById("orders-list-view").style.display = "";
   document.getElementById("orders-detail-view").style.display = "none";
@@ -458,7 +481,7 @@ async function openOrderDetail(orderNumber) {
 
     const payBadgeEl = document.getElementById("detail-payment-badge");
     if (payBadgeEl)
-      payBadgeEl.outerHTML = `<span id="detail-payment-badge">${statusBadge(o.payment_method === "cod" ? "Pending" : "Paid")}</span>`;
+      payBadgeEl.outerHTML = `<span id="detail-payment-badge">${statusBadge(paymentStatusLabel(o))}</span>`;
 
     // Items — API returns `quantity` and `unit_price` from order_items
     document.getElementById("detail-items").innerHTML = (o.items || [])
@@ -543,6 +566,21 @@ async function openOrderDetail(orderNumber) {
             )
             .join("")}
         </select>
+        <select class="filter-select" id="payment-status-select" style="height:36px;font-size:13px" title="Manually override payment status (use if PayMongo's webhook hasn't confirmed yet)">
+          ${[
+            ["unpaid", "Payment: Unpaid"],
+            ["processing", "Payment: Processing"],
+            ["paid", "Payment: Paid"],
+            ["failed", "Payment: Failed"],
+            ["refunded", "Payment: Refunded"],
+            ["cod", "Payment: COD"],
+          ]
+            .map(
+              ([val, label]) =>
+                `<option value="${val}" ${val === o.payment_status ? "selected" : ""}>${label}</option>`,
+            )
+            .join("")}
+        </select>
         <button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${o.order_id})">Update Status</button>
         <button class="btn btn-outline btn-sm" onclick="showOrdersList()">← Back</button>`;
     }
@@ -576,6 +614,7 @@ async function openOrderDetail(orderNumber) {
 
 async function updateOrderStatus(orderId) {
   const status = document.getElementById("status-select")?.value;
+  const paymentStatus = document.getElementById("payment-status-select")?.value;
   const tracking = document.getElementById("tracking-input")?.value || "";
   if (!status) return;
 
@@ -595,6 +634,7 @@ async function updateOrderStatus(orderId) {
       body: JSON.stringify({
         order_id: orderId,
         status,
+        payment_status: paymentStatus,
         tracking_number: tracking,
       }),
     });
@@ -603,6 +643,9 @@ async function updateOrderStatus(orderId) {
       const el = document.getElementById("detail-status-badge");
       if (el)
         el.outerHTML = `<span id="detail-status-badge">${statusBadge(status)}</span>`;
+      const payEl = document.getElementById("detail-payment-badge");
+      if (payEl)
+        payEl.outerHTML = `<span id="detail-payment-badge">${statusBadge(paymentStatusLabel({ payment_status: paymentStatus }))}</span>`;
       showToast("Order updated successfully.", "ok");
     } else {
       showToast(data.error || "Update failed.", "error");
@@ -790,7 +833,6 @@ async function createProduct() {
     return;
   }
 
-  // Build FormData
   const formData = new FormData();
   formData.append("name", name);
   formData.append("price", price);
@@ -809,6 +851,8 @@ async function createProduct() {
     const data = await res.json();
     if (data.success) {
       closeModal("modal-add-product");
+
+      // Clear modal fields for next use
       const fieldsToClear = [
         "new-product-name",
         "new-product-price",
@@ -823,8 +867,19 @@ async function createProduct() {
         "new-product-image-preview",
       );
       if (previewContainer) previewContainer.innerHTML = "";
-      renderProductsTable();
-      showToast("Product created successfully.", "ok");
+
+      // ✅ Open the newly created product in the editor
+      const newProductId = data.product_id; // backend must return product_id
+      if (newProductId) {
+        // Switch to products page (if not already) and open editor
+        navigate("products", document.querySelector("[onclick*=\"'products'\"]"));
+        await openProductEditor(newProductId);
+        showToast("Product created. You can now add variants.", "ok");
+      } else {
+        // Fallback: just refresh the table
+        renderProductsTable();
+        showToast("Product created successfully.", "ok");
+      }
     } else {
       showToast(data.error || "Failed to create product.", "error");
     }
@@ -869,12 +924,40 @@ async function saveProduct() {
     });
     const data = await res.json();
     if (data.success) {
+      // ✅ If this was a new product, capture the new product ID
+      if (!editingProductId && data.product_id) {
+        editingProductId = data.product_id;
+      }
+
+      // ✅ Auto‑save variants if there are any unsaved changes
+      if (currentVariants.length > 0 && editingProductId) {
+        // Save variants silently
+        const saveBtn = document.querySelector("#tab-variants .btn-primary.btn-sm");
+        if (saveBtn) setButtonLoading(saveBtn, true);
+        try {
+          const variantRes = await fetch(`${API}/products.php?id=${editingProductId}`, {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ variants: currentVariants }),
+          });
+          const variantData = await variantRes.json();
+          if (variantData.success) {
+            showToast("Product and variants saved.", "ok");
+          } else {
+            showToast("Product saved, but variants failed: " + (variantData.error || ""), "error");
+          }
+        } catch (err) {
+          showToast("Product saved, but variants could not be saved.", "error");
+        } finally {
+          if (saveBtn) setButtonLoading(saveBtn, false);
+        }
+      } else {
+        showToast(editingProductId ? "Product updated." : "Product created.", "ok");
+      }
+
       showProductsList();
       renderProductsTable();
-      showToast(
-        editingProductId ? "Product updated." : "Product created.",
-        "ok",
-      );
     } else {
       showToast(data.error || "Save failed.", "error");
     }
@@ -933,7 +1016,7 @@ async function renderCustomersTable() {
     if (!body) return;
 
     if (!data.success || !data.customers.length) {
-      body.innerHTML = `<tr><td colspan="7" class="text-muted text-sm" style="padding:16px">No customers found. </td></tr>`;
+      body.innerHTML = `<tr><td colspan="6" class="text-muted text-sm" style="padding:16px">No customers found. </td></tr>`;
     } else {
       body.innerHTML = data.customers
         .map(
@@ -948,7 +1031,6 @@ async function renderCustomersTable() {
           <td class="text-muted">${c.email}</td>
           <td>${c.order_count}</td>
           <td style="font-weight:500">${formatPrice(c.total_spent)}</td>
-          <td>${c.admin_notes ? `<span class="badge badge-processing">Has note</span>` : "—"}</td>
           <td class="text-muted">${new Date(c.created_at).toLocaleDateString("en-PH", { month: "short", year: "numeric" })}</td>
           <td><button class="ellipsis-btn">···</button></td>
         </tr>`,
@@ -1002,6 +1084,13 @@ async function openCustomerProfile(id) {
     document.getElementById("profile-total-spent").textContent = formatPrice(
       c.total_spent,
     );
+      
+      const sinceEl = document.getElementById("profile-since");
+if (sinceEl && c.created_at) {
+  const date = new Date(c.created_at);
+  const formatted = date.toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+  sinceEl.textContent = formatted;
+}
 
     // ── Update shipping address using the dedicated ID ──
     const addrDiv = document.getElementById("customer-shipping-address");
@@ -2155,13 +2244,73 @@ function renderVariants(sizes) {
     tbody.insertAdjacentHTML("beforeend", row);
   });
 }
+async function exportCustomers() {
+  try {
+    // Fetch all customers (increase limit to a high number)
+    const data = await fetchJSON(`${API}/customers.php?limit=5000`);
+    if (!data.success || !data.customers.length) {
+      showToast("No customers to export.", "error");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = ["Full Name", "Email", "Orders", "Total Spent", "Customer Since", "Internal Notes"];
+    const rows = data.customers.map(c => [
+      c.full_name,
+      c.email,
+      c.order_count,
+      c.total_spent,
+      new Date(c.created_at).toLocaleDateString("en-PH"),
+      (c.admin_notes || "").replace(/,/g, ";") // escape commas
+    ]);
+
+    // Build CSV content
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    // Download file
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute("download", `customers_${new Date().toISOString().slice(0,19)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Export complete.", "ok");
+  } catch (err) {
+    console.error(err);
+    showToast("Export failed.", "error");
+  }
+}
+function syncVariantsFromTable() {
+  const rows = document.querySelectorAll("#variants-table-body tr");
+  const variants = [];
+  rows.forEach((row) => {
+    const sizeSelect = row.querySelector('[data-field="size"]');
+    const stockInput = row.querySelector('[data-field="stock"]');
+    const skuInput = row.querySelector('[data-field="sku"]');
+    if (sizeSelect && stockInput) {
+      variants.push({
+        size: sizeSelect.value,
+        stock_qty: parseInt(stockInput.value) || 0,
+        sku: skuInput ? skuInput.value : "",
+      });
+    }
+  });
+  currentVariants = variants;
+}
 
 function addVariantRow() {
+  syncVariantsFromTable();
   currentVariants.push({ size: "M", stock_qty: 0, sku: "" });
   renderVariants(currentVariants);
 }
 
 function removeVariant(idx) {
+  syncVariantsFromTable();               
   currentVariants.splice(idx, 1);
   renderVariants(currentVariants);
 }

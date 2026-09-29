@@ -750,7 +750,7 @@ async function renderCustomersTable() {
     const body = document.getElementById("customers-body");
     if (!body) return;
     if (!data.success || !data.customers.length) {
-      body.innerHTML = `<tr><td colspan="7" class="text-muted">No customers found.</td></tr>`;
+      body.innerHTML = `<tr><td colspan="6" class="text-muted">No customers found.</td></tr>`;
     } else {
       body.innerHTML = data.customers
         .map(
@@ -760,7 +760,6 @@ async function renderCustomersTable() {
           <td class="text-muted">${c.email}</td>
           <td>${c.order_count}</td>
           <td>${formatPrice(c.total_spent)}</td>
-          <td>${c.admin_notes ? `<span class="badge badge-processing">Has note</span>` : "—"}</td>
           <td class="text-muted">${new Date(c.created_at).toLocaleDateString()}</td>
           <td><button class="ellipsis-btn">···</button></td>
          </tr>
@@ -800,6 +799,13 @@ async function openCustomerProfile(id) {
       c.total_spent,
     );
 
+      const sinceEl = document.getElementById("profile-since");
+if (sinceEl && c.created_at) {
+  const date = new Date(c.created_at);
+  const formatted = date.toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+  sinceEl.textContent = formatted;
+}
+      
     // ── Internal notes section (create if not exists) ──
     let notesDiv = document.getElementById("profile-admin-notes");
     if (!notesDiv) {
@@ -1325,6 +1331,47 @@ async function populateUserInfo() {
   }
 }
 
+async function exportCustomers() {
+  try {
+    // Fetch all customers (increase limit to a high number)
+    const data = await fetchJSON(`${API}/customers.php?limit=5000`);
+    if (!data.success || !data.customers.length) {
+      showToast("No customers to export.", "error");
+      return;
+    }
+
+    // Define CSV headers
+    const headers = ["Full Name", "Email", "Orders", "Total Spent", "Customer Since", "Internal Notes"];
+    const rows = data.customers.map(c => [
+      c.full_name,
+      c.email,
+      c.order_count,
+      c.total_spent,
+      new Date(c.created_at).toLocaleDateString("en-PH"),
+      (c.admin_notes || "").replace(/,/g, ";") // escape commas
+    ]);
+
+    // Build CSV content
+    const csvContent = [headers, ...rows]
+      .map(row => row.map(cell => `"${cell}"`).join(","))
+      .join("\n");
+
+    // Download file
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    link.href = url;
+    link.setAttribute("download", `customers_${new Date().toISOString().slice(0,19)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    showToast("Export complete.", "ok");
+  } catch (err) {
+    console.error(err);
+    showToast("Export failed.", "error");
+  }
+}
 // ========== INIT ==========
 function init() {
   applyStaffRestrictions();

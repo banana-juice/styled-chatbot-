@@ -1118,189 +1118,179 @@
           </div>
           <!-- /products -->
 
-          <div class="page" id="page-customers">
-            <div id="customers-list-view">
-              <div class="filter-bar">
-                <div class="search-wrap">
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <circle cx="11" cy="11" r="8" />
-                    <line x1="21" y1="21" x2="16.65" y2="16.65" /></svg
-                  ><input
-                    class="search-input"
-                    type="text"
-                    placeholder="Search customers…"
-                    oninput="filterCustomers(this.value)"
-                  />
-                </div>
-                <select class="filter-select">
-                  <option value="">All Tags</option>
-                  <option>Repeat Buyer</option>
-                  <option>New</option>
-                </select>
-                <button class="btn btn-outline btn-sm">
-                  <svg
-                    width="13"
-                    height="13"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Export CSV
-                </button>
-              </div>
-              <div class="card">
-                <div class="table-wrap">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Customer</th>
-                        <th>Email</th>
-                        <th>Orders</th>
-                        <th>Total Spent</th>
-                        <th>Tags</th>
-                        <th>Since</th>
-                        <th></th>
-                      </tr>
-                    </thead>
-                    <tbody id="customers-body"></tbody>
-                  </table>
-                </div>
-                <div class="pagination" id="customers-pagination"></div>
-              </div>
+        <div class="page" id="page-customers">
+  <div id="customers-list-view">
+    <div class="filter-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8" />
+          <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        </svg>
+        <input
+          class="search-input"
+          type="text"
+          placeholder="Search customers…"
+          oninput="filterCustomers(this.value)"
+        />
+      </div>
+      <!-- Tags dropdown removed -->
+      <button class="btn btn-outline btn-sm" onclick="exportCustomers()">
+        <svg
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+        >
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        Export CSV
+      </button>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Customer</th>
+              <th>Email</th>
+              <th>Orders</th>
+              <th>Total Spent</th>
+              <th>Since</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="customers-body"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="customers-pagination"></div>
+    </div>
+  </div>
+
+  <!-- Customer Profile -->
+  <div id="customer-profile-view" style="display: none">
+    <button class="back-link" onclick="showCustomersList()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="15 18 9 12 15 6" />
+      </svg>
+      Back to customers
+    </button>
+    <div
+      style="
+        display: grid;
+        grid-template-columns: 1fr 280px;
+        gap: 20px;
+        align-items: start;
+      "
+    >
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div class="card">
+          <div
+            style="
+              display: flex;
+              align-items: center;
+              gap: 14px;
+              margin-bottom: 16px;
+            "
+          >
+            <div
+              class="customer-avatar"
+              style="width: 48px; height: 48px; font-size: 19px"
+              id="profile-avatar"
+            >
+              B
             </div>
-            <div id="customer-profile-view" style="display: none">
-              <button class="back-link" onclick="showCustomersList()">
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-                Back to customers
-              </button>
+            <div>
               <div
+                id="profile-name"
                 style="
-                  display: grid;
-                  grid-template-columns: 1fr 280px;
-                  gap: 20px;
-                  align-items: start;
+                  font-size: 18px;
+                  font-weight: 500;
+                  color: var(--brown-400);
                 "
               >
-                <div style="display: flex; flex-direction: column; gap: 16px">
-                  <div class="card">
-                    <div
-                      style="
-                        display: flex;
-                        align-items: center;
-                        gap: 14px;
-                        margin-bottom: 16px;
-                      "
-                    >
-                      <div
-                        class="customer-avatar"
-                        style="width: 48px; height: 48px; font-size: 19px"
-                        id="profile-avatar"
-                      >
-                        B
-                      </div>
-                      <div>
-                        <div
-                          id="profile-name"
-                          style="
-                            font-size: 18px;
-                            font-weight: 500;
-                            color: var(--brown-400);
-                          "
-                        >
-                          Bea Santiago
-                        </div>
-                        <div id="profile-email" class="text-sm text-muted">
-                          bea.santiago@gmail.com
-                        </div>
-                      </div>
-                    </div>
-                    <div class="form-field">
-                      <label class="form-label">Internal Notes</label
-                      ><textarea
-                        class="form-textarea"
-                        placeholder="Add internal note…"
-                        rows="2"
-                      ></textarea>
-                    </div>
-                  </div>
-                  <div class="card">
-                    <div class="card-title mb-16">Order History</div>
-                    <div class="table-wrap">
-                      <table>
-                        <thead>
-                          <tr>
-                            <th>Order</th>
-                            <th>Date</th>
-                            <th>Status</th>
-                            <th>Total</th>
-                          </tr>
-                        </thead>
-                        <tbody id="profile-orders"></tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-                <div style="display: flex; flex-direction: column; gap: 16px">
-                  <div class="card">
-                    <div class="card-title mb-16">Summary</div>
-                    <div class="metric-row">
-                      <span class="text-muted text-sm">Total Orders</span
-                      ><span class="text-bold" id="profile-total-orders"
-                        >12</span
-                      >
-                    </div>
-                    <div class="metric-row">
-                      <span class="text-muted text-sm">Total Spent</span
-                      ><span class="text-bold" id="profile-total-spent"
-                        >₱62,340</span
-                      >
-                    </div>
-                    <div class="metric-row">
-                      <span class="text-muted text-sm">Avg. Order</span
-                      ><span class="text-sm">₱5,195</span>
-                    </div>
-                    <div class="metric-row">
-                      <span class="text-muted text-sm">Customer Since</span
-                      ><span class="text-sm">Jan 2024</span>
-                    </div>
-                  </div>
-                  <div class="card">
-                    <div class="card-title mb-16">Shipping Address</div>
-                    <div
-                      id="customer-shipping-address"
-                      style="
-                        font-size: 14px;
-                        color: var(--brown-300);
-                        line-height: 1.8;
-                      "
-                    >
-                      123 Ayala Avenue<br />Makati City, Metro Manila<br />Philippines
-                      1226
-                    </div>
-                  </div>
-                </div>
+                Bea Santiago
+              </div>
+              <div id="profile-email" class="text-sm text-muted">
+                bea.santiago@gmail.com
               </div>
             </div>
           </div>
+          <div class="form-field">
+            <label class="form-label">Internal Notes</label>
+            <textarea
+              class="form-textarea"
+              placeholder="Add internal note…"
+              rows="2"
+              id="profile-admin-notes"
+            ></textarea>
+            <button
+              class="btn btn-primary btn-sm"
+              style="margin-top: 8px"
+              onclick="saveCustomerNote()"
+            >
+              Save Note
+            </button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title mb-16">Order History</div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Order</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody id="profile-orders"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 16px">
+        <div class="card">
+          <div class="card-title mb-16">Summary</div>
+          <div class="metric-row">
+            <span class="text-muted text-sm">Total Orders</span
+            ><span class="text-bold" id="profile-total-orders">12</span>
+          </div>
+          <div class="metric-row">
+            <span class="text-muted text-sm">Total Spent</span
+            ><span class="text-bold" id="profile-total-spent">₱62,340</span>
+          </div>
+          <div class="metric-row">
+            <span class="text-muted text-sm">Avg. Order</span
+            ><span class="text-sm">₱5,195</span>
+          </div>
+          <div class="metric-row">
+            <span class="text-muted text-sm">Customer Since</span>
+            <span class="text-sm" id="profile-since">Jan 2024</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title mb-16">Shipping Address</div>
+          <div
+            id="customer-shipping-address"
+            style="
+              font-size: 14px;
+              color: var(--brown-300);
+              line-height: 1.8;
+            "
+          >
+            123 Ayala Avenue<br />Makati City, Metro Manila<br />Philippines
+            1226
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
           <!-- /customers -->
 
           <div class="page" id="page-promotions">

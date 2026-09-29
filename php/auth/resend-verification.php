@@ -1,9 +1,14 @@
 <?php
-// ============================================
-// RESEND VERIFICATION — php/auth/resend-verification.php
-// ============================================
-// POST: { email }
-// Returns JSON: { success } | { success: false, error }
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -22,11 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/../config/smtp.php';
-
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/brevo_email.php';
 
 // ── 1. Read input ─────────────────────────────────────────────────────────────
 $input = json_decode(file_get_contents('php://input'), true);
@@ -85,38 +86,19 @@ $pdo->prepare(
      VALUES (?, ?, NOW() + INTERVAL 15 MINUTE)'
 )->execute([$user_id, $code]);
 
-// ── 5. Send email ─────────────────────────────────────────────────────────────
-$mail = new PHPMailer(true);
+// ── 5. Send email via Brevo API ───────────────────────────────────────────────
+$subject = 'Your new Styled verification code';
+$htmlBody = "
+<div style='font-family:sans-serif;max-width:480px;margin:auto;padding:32px;'>
+    <h2 style='color:#2c1f14;margin-bottom:8px;font-family:Georgia,serif;font-weight:400;'>New verification code</h2>
+    <p style='color:#8a7f74;font-size:14px;line-height:1.7;'>Hi {$full_name}, here is your new verification code:</p>
+    <div style='font-size:40px;font-weight:400;letter-spacing:14px;text-align:center;padding:28px;background:#f5f0e8;margin:28px 0;color:#2c1f14;font-family:Georgia,serif;'>{$code}</div>
+    <p style='color:#8a7f74;font-size:12px;'>This code expires in <strong style='color:#2c1f14;'>15 minutes</strong>.</p>
+</div>";
+$textBody = "Your new Styled verification code is: {$code}. It expires in 15 minutes.";
 
-try {
-    $mail->isSMTP();
-    $mail->Host       = SMTP_HOST;
-    $mail->SMTPAuth   = true;
-    $mail->Username   = SMTP_USER;
-    $mail->Password   = SMTP_PASS;
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port       = SMTP_PORT;
-
-    $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
-    $mail->addAddress($email, $full_name);
-
-    $mail->isHTML(true);
-    $mail->Subject = 'Your new Styled verification code';
-    $mail->Body    = "
-        <div style='font-family:sans-serif;max-width:480px;margin:auto;padding:32px;'>
-            <h2 style='color:#2c1f14;margin-bottom:8px;font-family:Georgia,serif;font-weight:400;'>New verification code</h2>
-            <p style='color:#8a7f74;font-size:14px;line-height:1.7;'>Hi {$full_name}, here is your new verification code:</p>
-            <div style='font-size:40px;font-weight:400;letter-spacing:14px;text-align:center;
-                        padding:28px;background:#f5f0e8;margin:28px 0;color:#2c1f14;font-family:Georgia,serif;'>
-                {$code}
-            </div>
-            <p style='color:#8a7f74;font-size:12px;'>This code expires in <strong style='color:#2c1f14;'>15 minutes</strong>.</p>
-        </div>
-    ";
-    $mail->AltBody = "Your new Styled verification code is: {$code}. It expires in 15 minutes.";
-
-    $mail->send();
-} catch (Exception $e) {
+$sent = sendEmailViaBrevo($email, $full_name, $subject, $htmlBody, $textBody);
+if (!$sent) {
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Could not send email. Please try again.']);
     exit;

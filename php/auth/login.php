@@ -1,11 +1,14 @@
 <?php
-// ============================================
-// LOGIN — php/auth/login.php
-// ============================================
-// POST: email, password
-// Returns JSON: { success, user: { user_id, full_name, email, role } }
-//             | { success: false, error }
-//             | { success: false, unverified: true, email } — login blocked
+// CORS headers
+header("Access-Control-Allow-Origin: https://styled.great-site.net");
+header("Access-Control-Allow-Methods: POST, GET, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Access-Control-Allow-Credentials: true");
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    exit();
+}
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -89,7 +92,15 @@ $_SESSION['role']      = $user['role'];
 
 session_regenerate_id(true);
 
-// ── 7. Return success ─────────────────────────────────────────────────────────
+$remember = $input['remember'] ?? false;
+if ($remember) {
+    // Extend the session cookie lifetime to 30 days (30*24*3600 seconds)
+    $sessionName = session_name();
+    $sessionId   = session_id();
+    setcookie($sessionName, $sessionId, time() + 30 * 86400, '/', '', false, true);
+}
+
+// ── 8. Return success ─────────────────────────────────────────────────────────
 echo json_encode([
     'success' => true,
     'user'    => [

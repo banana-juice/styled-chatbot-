@@ -59,3 +59,13 @@
 .toast.error {
   background: #c0392b;
 }
+
+/* MOBILE FIXES - staff.css */
+@media (max-width: 480px) {
+  .toast {
+    white-space: normal;
+    max-width: 90vw;
+    font-size: 11px;
+    padding: 8px 12px;
+  }
+}

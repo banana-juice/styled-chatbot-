@@ -2106,3 +2106,77 @@ code {
   border-radius: 10px;
   font-weight: 500;
 }
+
+/* ============================================
+   RESPONSIVE: admin.css
+   ============================================ */
+
+@media (max-width: 992px) {
+  .app-shell {
+    grid-template-columns: 200px 1fr;
+  }
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    width: 260px;
+    z-index: 1000;
+    transition: left 0.3s;
+  }
+  .sidebar.open {
+    left: 0;
+  }
+  .main-content {
+    margin-left: 0;
+  }
+  .topbar {
+    padding: 0 20px;
+  }
+  .page-body {
+    padding: 24px 20px;
+  }
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+  .dashboard-grid-3, .analytics-charts {
+    grid-template-columns: 1fr;
+  }
+  .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .search-wrap, .filter-select {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .stat-value {
+    font-size: 22px;
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .modal {
+    width: 95%;
+  }
+}

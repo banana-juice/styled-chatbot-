@@ -1,1 +1,4 @@
 .env
+*.log
+brevo_debug.txt
+paymongo_webhook_debug.log
