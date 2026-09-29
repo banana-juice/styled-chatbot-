@@ -170,6 +170,66 @@ try {
 
     $pdo->beginTransaction();
 
+    // ── Reserve stock ─────────────────────────────────────────────────────
+    // Nothing in this codebase decremented product_sizes.stock_qty on
+    // checkout, on payment confirmation, or anywhere else — the storefront's
+    // "X left" was purely cosmetic and the store could oversell indefinitely.
+    // Decrementing here, inside the same transaction as the order itself,
+    // means a failed/insufficient-stock item rolls back the whole order
+    // (nothing partially created), and the conditional
+    // "stock_qty >= qty" in the UPDATE's WHERE clause makes each decrement
+    // atomic at the database level — two simultaneous checkouts for the
+    // last unit can't both succeed, InnoDB's row lock serializes them and
+    // the second one's UPDATE simply matches 0 rows.
+    //
+    // Items with no matching product_sizes row (no size tracked for that
+    // product/size — true for some of the catalog, e.g. most accessories)
+    // are left alone rather than blocked, since stock was never modeled
+    // for them and blocking would change existing purchasable behavior.
+    $stockStmt = $pdo->prepare(
+        'UPDATE product_sizes SET stock_qty = stock_qty - :qty
+         WHERE product_id = :pid AND size = :size AND stock_qty >= :qty2'
+    );
+    $stockExistsStmt = $pdo->prepare(
+        'SELECT stock_qty FROM product_sizes WHERE product_id = :pid AND size = :size LIMIT 1'
+    );
+    $nameStmt = $pdo->prepare('SELECT name FROM products WHERE product_id = :pid LIMIT 1');
+
+    foreach ($validated_items as $item) {
+        if ($item['size'] === '') {
+            continue; // no size-level stock tracked for this item
+        }
+
+        $stockExistsStmt->execute([':pid' => $item['product_id'], ':size' => $item['size']]);
+        $sizeRow = $stockExistsStmt->fetch(PDO::FETCH_ASSOC);
+        if ($sizeRow === false) {
+            continue; // not stock-tracked for this product/size — allow as before
+        }
+
+        $stockStmt->execute([
+            ':qty'   => $item['qty'],
+            ':pid'   => $item['product_id'],
+            ':size'  => $item['size'],
+            ':qty2'  => $item['qty'],
+        ]);
+
+        if ($stockStmt->rowCount() === 0) {
+            // Someone else's checkout (or a stale cart) already took the
+            // remaining stock between the customer adding to cart and
+            // checking out now.
+            $pdo->rollBack();
+            $nameStmt->execute([':pid' => $item['product_id']]);
+            $productName = $nameStmt->fetchColumn() ?: 'One of the items';
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode([
+                'error' => "{$productName} (size {$item['size']}) doesn't have enough stock left. Only {$sizeRow['stock_qty']} available.",
+                'code'  => 'insufficient_stock',
+            ]);
+            exit;
+        }
+    }
+
     // ── Address handling (insert or reuse) ──────────────────────────────────
     $street   = trim($shipping_address['street']);
     $city     = trim($shipping_address['city']);
