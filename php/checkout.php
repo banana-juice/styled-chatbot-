@@ -225,6 +225,7 @@ try {
         'SELECT stock_qty FROM product_sizes WHERE product_id = :pid AND size = :size LIMIT 1'
     );
     $nameStmt = $pdo->prepare('SELECT name FROM products WHERE product_id = :pid LIMIT 1');
+    $anyRowStmt = $pdo->prepare('SELECT 1 FROM product_sizes WHERE product_id = :pid LIMIT 1');
 
     foreach ($validated_items as $item) {
         if ($item['size'] === '') {
@@ -234,7 +235,23 @@ try {
         $stockExistsStmt->execute([':pid' => $item['product_id'], ':size' => $item['size']]);
         $sizeRow = $stockExistsStmt->fetch(PDO::FETCH_ASSOC);
         if ($sizeRow === false) {
-            continue; // not stock-tracked for this product/size — allow as before
+            // A product with no size rows at all isn't stock-tracked (allow as
+            // before). But if it HAS size rows and this size isn't one of
+            // them (e.g. XXL), buying it would bypass stock entirely.
+            $anyRowStmt->execute([':pid' => $item['product_id']]);
+            if ($anyRowStmt->fetchColumn() === false) {
+                continue;
+            }
+            $pdo->rollBack();
+            $nameStmt->execute([':pid' => $item['product_id']]);
+            $productName = $nameStmt->fetchColumn() ?: 'One of the items';
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode([
+                'error' => "{$productName} isn't available in size {$item['size']}.",
+                'code'  => 'size_unavailable',
+            ]);
+            exit;
         }
 
         $stockStmt->execute([

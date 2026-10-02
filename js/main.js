@@ -1229,13 +1229,7 @@ function buildProductModal() {
         <p class="pm-price" id="pm-price"></p>
         <p class="pm-desc" id="pm-desc"></p>
         <div class="pm-section-label">SIZE</div>
-        <div class="pm-sizes" id="pm-sizes">
-          <button class="pm-size" data-size="S">S</button>
-          <button class="pm-size active" data-size="M">M</button>
-          <button class="pm-size" data-size="L">L</button>
-          <button class="pm-size" data-size="XL">XL</button>
-          <button class="pm-size" data-size="XXL">XXL</button>
-        </div>
+        <div class="pm-sizes" id="pm-sizes"></div>
         <div class="pm-section-label">QUANTITY</div>
         <div class="pm-qty-wrap">
           <button class="pm-qty-btn" id="pm-qty-minus">−</button>
@@ -1275,13 +1269,13 @@ function buildProductModal() {
     document.getElementById("pm-qty-num").textContent = qty;
   });
 
-  modal.querySelectorAll(".pm-size").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      modal
-        .querySelectorAll(".pm-size")
-        .forEach((b) => b.classList.remove("active"));
-      btn.classList.add("active");
-    });
+  document.getElementById("pm-sizes").addEventListener("click", (e) => {
+    const btn = e.target.closest(".pm-size");
+    if (!btn) return;
+    modal
+      .querySelectorAll(".pm-size")
+      .forEach((b) => b.classList.remove("active"));
+    btn.classList.add("active");
   });
 
   document.getElementById("pm-add-cart").addEventListener("click", async () => {
@@ -1401,11 +1395,21 @@ function openProductModal(product, categoryKey) {
   };
 
   document.getElementById("pm-qty-num").textContent = "1";
-  document
-    .querySelectorAll(".pm-size")
-    .forEach((b) => b.classList.remove("active"));
+  // Build size buttons from the product's real sizes (the catalog only
+  // stocks XS-XL; a hardcoded S-XXL list offered an XXL that doesn't exist).
+  const sizeList = (
+    Array.isArray(product.sizes) && product.sizes.length
+      ? product.sizes
+      : ["XS", "S", "M", "L", "XL"]
+  ).map((s) => (typeof s === "string" ? s : s.size));
+  sizesEl.innerHTML = sizeList
+    .map((s) => `<button class="pm-size" data-size="${s}">${s}</button>`)
+    .join("");
   if (hasSize) {
-    document.querySelector(".pm-size[data-size='M']")?.classList.add("active");
+    const defaultSize = sizeList.includes("M") ? "M" : sizeList[0];
+    sizesEl
+      .querySelector(`.pm-size[data-size='${defaultSize}']`)
+      ?.classList.add("active");
   }
 
   // Store context so pm-add-cart can resolve product_id in all cases
@@ -1659,8 +1663,19 @@ if (
 // ============================================
 // INIT
 // ============================================
+async function syncFreeShippingText() {
+  const els = document.querySelectorAll("[data-free-shipping-threshold]");
+  if (!els.length) return;
+  const shipping = await fetchSettingsGroup("shipping");
+  const threshold = parseFloat(shipping["shipping-free-threshold"]);
+  if (!Number.isFinite(threshold)) return;
+  const label = "₱" + threshold.toLocaleString("en-PH");
+  els.forEach((el) => (el.textContent = label));
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   initAllSearches();
+  syncFreeShippingText();
   updateBadge();
   buildNavIcons();
   initShopNavLink();

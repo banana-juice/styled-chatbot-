@@ -261,6 +261,20 @@ function toolGetProductDetails(PDO $pdo, array $input): array {
  * on the query that produced $order — this helper only formats, it does
  * not re-check ownership.
  */
+function styledPaymentSummary(string $method, string $status): string {
+    if ($method === 'cod' || $status === 'cod') {
+        return 'Cash on Delivery: not paid yet, the customer pays in cash when the order arrives';
+    }
+    $map = [
+        'paid'       => 'Paid online',
+        'processing' => 'Online payment is still being confirmed, not marked paid yet',
+        'unpaid'     => 'Not paid yet, online payment has not been completed',
+        'failed'     => 'Online payment failed, not paid',
+        'refunded'   => 'Payment was refunded',
+    ];
+    return $map[$status] ?? ucfirst($status);
+}
+
 function styledFetchOrderDetail(PDO $pdo, array $order): array {
     $itemsStmt = $pdo->prepare('
         SELECT oi.qty, oi.unit_price, oi.size, COALESCE(p.name, \'Product\') AS product_name
@@ -291,6 +305,8 @@ function styledFetchOrderDetail(PDO $pdo, array $order): array {
         'order_number'     => $order['order_number'],
         'status'           => ucfirst($order['status']),
         'total'            => '₱' . number_format((float) $order['grand_total'], 2),
+        'payment_method'   => $order['payment_method'],
+        'payment'          => styledPaymentSummary((string) $order['payment_method'], (string) $order['payment_status']),
         'placed_on'        => date('M d, Y', strtotime($order['created_at'])),
         'tracking_number'  => $order['tracking_number'] ?: null,
         'shipping_address' => $address,
@@ -322,7 +338,8 @@ function toolGetOrderByNumber(PDO $pdo, int $userId, array $input): array {
     // order_number the model or customer supplies can ever return someone
     // else's order.
     $stmt = $pdo->prepare(
-        'SELECT order_id, order_number, status, grand_total, created_at, tracking_number, address_id
+        'SELECT order_id, order_number, status, grand_total, created_at, tracking_number, address_id,
+                payment_method, payment_status
          FROM orders WHERE order_number = ? AND user_id = ? LIMIT 1'
     );
     $stmt->execute([$orderNumber, $userId]);
@@ -527,7 +544,8 @@ if (!$account) {
 // reached through the get_order_by_number tool instead, scoped by
 // user_id there the same way this query is scoped here.
 $ordersStmt = $pdo->prepare('
-    SELECT order_id, order_number, status, grand_total, created_at, tracking_number, address_id
+    SELECT order_id, order_number, status, grand_total, created_at, tracking_number, address_id,
+           payment_method, payment_status
     FROM orders
     WHERE user_id = ?
     ORDER BY created_at DESC
@@ -686,6 +704,10 @@ PRODUCT TOOLS — how to use them:
 - If asked about a promo/discount code, call check_promo_code before saying
   whether it works. It only reports status — you cannot apply a code to an
   order or cart yourself.
+- Each order has a "payment" field. Only say a customer "paid" when it says
+  Paid online. For Cash on Delivery, say the amount is payable on delivery.
+  For an unconfirmed or failed online payment, say exactly that. Never
+  assume an order is paid just because it exists.
 - Use the customer's own words for an item (if they say "hoodie", don't
   correct them to a different term).
 - This chatbot cannot process payments, refunds, cancellations, apply promo
