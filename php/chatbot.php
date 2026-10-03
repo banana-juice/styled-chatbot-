@@ -61,6 +61,53 @@ function styledNormalizeSize(mixed $size): ?string {
     return in_array($size, VALID_SIZES, true) ? $size : null;
 }
 
+/**
+ * Resolves one active product by ID, or by exact then partial name. Returns
+ * either ['product' => row|null] or ['ambiguous' => matches] when a partial
+ * name matches more than one product.
+ */
+function styledFindProduct(PDO $pdo, int $productId, string $productName): array {
+    $select = 'SELECT p.product_id, p.name, p.description, p.price, p.sale_price, c.name AS category
+               FROM products p
+               JOIN categories c ON c.category_id = p.category_id
+               WHERE p.is_active = 1 AND p.status = \'active\' AND ';
+
+    if ($productId > 0) {
+        $stmt = $pdo->prepare($select . 'p.product_id = ? LIMIT 1');
+        $stmt->execute([$productId]);
+        return ['product' => $stmt->fetch() ?: null];
+    }
+
+    $stmt = $pdo->prepare($select . 'LOWER(p.name) = LOWER(?) LIMIT 1');
+    $stmt->execute([$productName]);
+    $product = $stmt->fetch();
+    if ($product) {
+        return ['product' => $product];
+    }
+
+    $stmt = $pdo->prepare($select . 'p.name LIKE ? LIMIT 6');
+    $stmt->execute(['%' . $productName . '%']);
+    $matches = $stmt->fetchAll();
+    if (count($matches) > 1) {
+        return ['ambiguous' => $matches];
+    }
+    return ['product' => $matches[0] ?? null];
+}
+
+function styledAmbiguousProductResponse(array $matches): array {
+    $names = array_map(static fn (array $m): string => $m['name'], $matches);
+    return [
+        'found'     => false,
+        'ambiguous' => true,
+        'message'   => 'More than one product matches that name: ' . implode(', ', $names)
+            . '. Tell the customer these options and ask which one they mean.',
+        'matches'   => array_map(
+            static fn (array $m): array => ['product_id' => (int) $m['product_id'], 'name' => $m['name']],
+            $matches
+        ),
+    ];
+}
+
 function toolCheckStock(PDO $pdo, array $input): array {
     $productId   = isset($input['product_id']) ? (int) $input['product_id'] : 0;
     $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
@@ -70,44 +117,11 @@ function toolCheckStock(PDO $pdo, array $input): array {
         return ['error' => 'Provide either product_id or product_name.'];
     }
 
-    if ($productId > 0) {
-        $stmt = $pdo->prepare(
-            "SELECT product_id, name, price, sale_price FROM products
-             WHERE product_id = ? AND is_active = 1 AND status = 'active' LIMIT 1"
-        );
-        $stmt->execute([$productId]);
-        $product = $stmt->fetch();
-    } else {
-        // Exact (case-insensitive) match first.
-        $stmt = $pdo->prepare(
-            "SELECT product_id, name, price, sale_price FROM products
-             WHERE LOWER(name) = LOWER(?) AND is_active = 1 AND status = 'active' LIMIT 1"
-        );
-        $stmt->execute([$productName]);
-        $product = $stmt->fetch();
-
-        if (!$product) {
-            $stmt = $pdo->prepare(
-                "SELECT product_id, name, price, sale_price FROM products
-                 WHERE name LIKE ? AND is_active = 1 AND status = 'active' LIMIT 6"
-            );
-            $stmt->execute(['%' . $productName . '%']);
-            $matches = $stmt->fetchAll();
-
-            if (count($matches) > 1) {
-                return [
-                    'found'     => false,
-                    'ambiguous' => true,
-                    'message'   => 'More than one product matches that name — ask the customer which one they mean, or call this again with the exact product_id.',
-                    'matches'   => array_map(
-                        static fn (array $m): array => ['product_id' => (int) $m['product_id'], 'name' => $m['name']],
-                        $matches
-                    ),
-                ];
-            }
-            $product = $matches[0] ?? null;
-        }
+    $found = styledFindProduct($pdo, $productId, $productName);
+    if (isset($found['ambiguous'])) {
+        return styledAmbiguousProductResponse($found['ambiguous']);
     }
+    $product = $found['product'];
 
     if (!$product) {
         return ['found' => false, 'message' => 'No product matches that name or ID in the catalog.'];
@@ -201,29 +215,27 @@ function toolListProducts(PDO $pdo, array $input): array {
 }
 
 function toolGetProductDetails(PDO $pdo, array $input): array {
-    $productId = isset($input['product_id']) ? (int) $input['product_id'] : 0;
-    if ($productId <= 0) {
-        return ['error' => 'product_id is required.'];
+    $productId   = isset($input['product_id']) ? (int) $input['product_id'] : 0;
+    $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
+    if ($productId <= 0 && $productName === '') {
+        return ['error' => 'Provide either product_id or product_name.'];
     }
 
-    $stmt = $pdo->prepare(
-        "SELECT p.product_id, p.name, p.description, p.price, p.sale_price, c.name AS category
-         FROM products p
-         JOIN categories c ON c.category_id = p.category_id
-         WHERE p.product_id = ? AND p.is_active = 1 AND p.status = 'active' LIMIT 1"
-    );
-    $stmt->execute([$productId]);
-    $product = $stmt->fetch();
+    $found = styledFindProduct($pdo, $productId, $productName);
+    if (isset($found['ambiguous'])) {
+        return styledAmbiguousProductResponse($found['ambiguous']);
+    }
+    $product = $found['product'];
 
     if (!$product) {
-        return ['found' => false, 'message' => 'No active product with that ID.'];
+        return ['found' => false, 'message' => 'No active product matches that name or ID.'];
     }
 
     $stmt = $pdo->prepare(
         "SELECT size, stock_qty FROM product_sizes WHERE product_id = ?
          ORDER BY FIELD(size, 'XS', 'S', 'M', 'L', 'XL', 'XXL')"
     );
-    $stmt->execute([$productId]);
+    $stmt->execute([$product['product_id']]);
     $sizes = $stmt->fetchAll();
 
     $out = [
@@ -433,13 +445,14 @@ $shoppingTools = [
     ],
     [
         'name'        => 'get_product_details',
-        'description' => "Get full details for one product: price, description, and per-size stock. Use after list_products or check_stock to answer a follow-up question about one specific item (e.g. 'tell me more about the second one').",
+        'description' => "Get full details for one product: category, price, the product description, and per-size stock. Use this for any question about a specific item (what it is, how it's described, its price, sizes, or stock). Pass product_name as the customer said it, or product_id if you already have it from an earlier result (e.g. 'tell me more about the second one').",
         'input_schema' => [
             'type'       => 'object',
             'properties' => [
-                'product_id' => ['type' => 'integer', 'description' => "The product's ID, from a previous list_products or check_stock result."],
+                'product_id'   => ['type' => 'integer', 'description' => "The product's ID, from a previous list_products or check_stock result."],
+                'product_name' => ['type' => 'string', 'description' => "Product name or partial name as the customer said it, e.g. 'Gold Pearl Drops'. Ignored if product_id is given."],
             ],
-            'required'   => ['product_id'],
+            'required'   => [],
         ],
     ],
     [
@@ -686,6 +699,16 @@ PRODUCT TOOLS — how to use them:
   Dress in M", "is this still available"), call check_stock or list_products
   before answering. Never state a stock number you didn't just get from a
   tool.
+- If asked about a specific item (what it is, how it looks or is described,
+  its price, sizes, or stock), call get_product_details with product_name
+  before answering. Describe the item only from the description and fields
+  it returns. If the customer asks about something the description does not
+  say (material, fabric, care, fit, warmth), say you don't have that detail
+  rather than guessing.
+- If a product tool says a name matches more than one product, list those
+  product names for the customer and ask which one they mean.
+- Quote prices exactly as the tool returned them (for example ₱330.00). Never
+  add, drop, or change any digit.
 - If asked "what do you have" or to browse a category, call list_products
   and summarize the results grouped by category, not as one long list.
 - If an item is out of stock (or a requested size is), say so plainly, then
