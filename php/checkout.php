@@ -108,17 +108,31 @@ try {
     // a guess based on the chosen payment method.
     $payment_status = ($payment_method === 'cod') ? 'cod' : 'unpaid';
 
+    // The price is always read from the database. A unit_price sent by the
+    // browser is ignored, otherwise anyone could edit the request and pay
+    // any amount for any product.
+    $priceStmt = $pdo->prepare("SELECT price FROM products WHERE product_id = :pid AND status = 'active' LIMIT 1");
+
     $validated_items = [];
     foreach ($items as $item) {
         $product_id = isset($item['product_id']) ? (int) $item['product_id'] : 0;
         $qty        = isset($item['qty'])        ? (int) $item['qty']        : 0;
-        $unit_price = isset($item['unit_price']) ? (float) $item['unit_price'] : 0.0;
         $size       = trim($item['size'] ?? '');
 
-        if ($product_id <= 0 || $qty <= 0 || $unit_price <= 0) {
+        if ($product_id <= 0 || $qty <= 0) {
             ob_end_clean();
             http_response_code(400);
-            echo json_encode(['error' => 'Each item must have valid product_id, qty, and unit_price']);
+            echo json_encode(['error' => 'Each item must have a valid product_id and qty']);
+            exit;
+        }
+
+        $priceStmt->execute([':pid' => $product_id]);
+        $dbPrice = $priceStmt->fetchColumn();
+        $unit_price = $dbPrice === false ? 0.0 : (float) preg_replace('/[^0-9.]/', '', (string) $dbPrice);
+        if ($unit_price <= 0) {
+            ob_end_clean();
+            http_response_code(400);
+            echo json_encode(['error' => 'One of the items is no longer available.', 'code' => 'product_unavailable']);
             exit;
         }
 
