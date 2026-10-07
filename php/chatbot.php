@@ -792,7 +792,7 @@ customer. Follow these exactly:
 PROMPT;
 
 // ── 5. Call the Anthropic API, looping while Claude wants to use a tool ─────
-$apiKey = getenv('ANTHROPIC_API_KEY');
+$apiKey = env_value('ANTHROPIC_API_KEY');
 if (!$apiKey) {
     error_log('chatbot.php: ANTHROPIC_API_KEY is not set.');
     chatFail(500, 'Chat support is temporarily unavailable. Please try again later.', 'no_api_key',

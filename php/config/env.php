@@ -8,6 +8,27 @@
 //
 // Usage: require_once __DIR__ . '/env.php'; loadEnv();
 
+/**
+ * Read one config value. Looks in the real environment first, then in the
+ * values loadEnv() parsed from .env. This does NOT depend on putenv()/getenv()
+ * working: shared hosts commonly disable putenv(), and when that happened
+ * every setting read back empty (the app fell back to localhost/root for the
+ * database and to "not configured" for the payment webhook).
+ */
+function env_value(string $key, $default = null) {
+    $v = getenv($key);
+    if ($v !== false && $v !== '') {
+        return $v;
+    }
+    if (isset($_ENV[$key]) && $_ENV[$key] !== '') {
+        return $_ENV[$key];
+    }
+    if (isset($_SERVER[$key]) && is_string($_SERVER[$key]) && $_SERVER[$key] !== '') {
+        return $_SERVER[$key];
+    }
+    return $default;
+}
+
 function loadEnv(): void {
     static $loaded = false;
     if ($loaded) {
@@ -16,17 +37,17 @@ function loadEnv(): void {
     $loaded = true;
 
     $path = __DIR__ . '/../../.env';
-    if (!is_readable($path)) {
+    $raw  = @file_get_contents($path);
+    if ($raw === false) {
+        error_log('loadEnv: could not read ' . $path);
         return;
     }
-
-    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-    if ($lines === false) {
-        return;
-    }
+    $lines = preg_split('/\r\n|\r|\n/', $raw);
 
     foreach ($lines as $line) {
         $line = trim($line);
+        // A UTF-8 byte-order mark would otherwise glue itself to the first key.
+        $line = preg_replace('/^\xEF\xBB\xBF/', '', $line);
         if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
             continue;
         }
@@ -44,12 +65,21 @@ function loadEnv(): void {
             }
         }
 
-        // Never override a value already set in the real environment.
+        // A real environment variable always wins over the file.
         if ($key === '' || getenv($key) !== false) {
             continue;
         }
 
-        putenv("$key=$value");
-        $_ENV[$key] = $value;
+        // First occurrence wins, so a duplicated line later in the file
+        // can't silently change a value.
+        if (isset($_ENV[$key])) {
+            continue;
+        }
+
+        $_ENV[$key]    = $value;
+        $_SERVER[$key] = $value;
+        if (function_exists('putenv')) {
+            @putenv("$key=$value"); // best effort only; env_value() doesn't need it
+        }
     }
 }

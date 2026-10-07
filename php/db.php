@@ -17,10 +17,10 @@ date_default_timezone_set(APP_TIMEZONE);
 // file — same pattern as ANTHROPIC_API_KEY in php/chatbot.php. Falls back
 // to XAMPP's local defaults when nothing is set, so local dev needs no
 // .env entries at all.
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_NAME', getenv('DB_NAME') ?: 'styled_db');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: '');
+define('DB_HOST', env_value('DB_HOST') ?: 'localhost');
+define('DB_NAME', env_value('DB_NAME') ?: 'styled_db');
+define('DB_USER', env_value('DB_USER') ?: 'root');
+define('DB_PASS', env_value('DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
 function getPDO(): PDO {

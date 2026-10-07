@@ -27,8 +27,8 @@
 require_once __DIR__ . '/env.php';
 loadEnv();
 
-define('PAYMONGO_SECRET_KEY', getenv('PAYMONGO_SECRET_KEY') ?: 'PAYMONGO_SECRET_KEY');
-define('PAYMONGO_PUBLIC_KEY', getenv('PAYMONGO_PUBLIC_KEY') ?: 'PAYMONGO_PUBLIC_KEY');
+define('PAYMONGO_SECRET_KEY', env_value('PAYMONGO_SECRET_KEY') ?: 'PAYMONGO_SECRET_KEY');
+define('PAYMONGO_PUBLIC_KEY', env_value('PAYMONGO_PUBLIC_KEY') ?: 'PAYMONGO_PUBLIC_KEY');
 
 // Dashboard > Developers > Webhooks > (your webhook) > Signing Secret
 // No default on purpose. This used to fall back to the literal string
@@ -36,8 +36,16 @@ define('PAYMONGO_PUBLIC_KEY', getenv('PAYMONGO_PUBLIC_KEY') ?: 'PAYMONGO_PUBLIC_
 // fail signature verification (so no order ever became "paid" on its own)
 // while also being a publicly guessable signing key. An unset secret now
 // makes the webhook refuse to run and say why.
-define('PAYMONGO_WEBHOOK_SECRET', getenv('PAYMONGO_WEBHOOK_SECRET') ?: '');
+define('PAYMONGO_WEBHOOK_SECRET', env_value('PAYMONGO_WEBHOOK_SECRET') ?: '');
 
 // Base URL of the deployed site, NO trailing slash. Used to build the
 // success_url / cancel_url PayMongo redirects the customer back to.
-define('SITE_URL', getenv('SITE_URL') ?: 'https://styled.great-site.net/styled');
+// The app is served from the /styled folder. A SITE_URL set to just the domain
+// (https://styled.great-site.net) made the PayMongo success/cancel links point
+// at /orders.html instead of /styled/orders.html, so normalise it here.
+$__siteUrl = rtrim((string) (env_value('SITE_URL') ?: 'https://styled.great-site.net/styled'), '/');
+if (!preg_match('#/styled$#', $__siteUrl)) {
+    $__siteUrl .= '/styled';
+}
+define('SITE_URL', $__siteUrl);
+unset($__siteUrl);

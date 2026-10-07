@@ -14,14 +14,14 @@
 require_once __DIR__ . '/env.php';
 loadEnv();
 
-define('GOOGLE_CLIENT_ID',     getenv('GOOGLE_CLIENT_ID') ?: 'GOOGLE_CLIENT_ID');
-define('GOOGLE_CLIENT_SECRET', getenv('GOOGLE_CLIENT_SECRET') ?: 'GOOGLE_CLIENT_SECRET');
+define('GOOGLE_CLIENT_ID',     env_value('GOOGLE_CLIENT_ID') ?: 'GOOGLE_CLIENT_ID');
+define('GOOGLE_CLIENT_SECRET', env_value('GOOGLE_CLIENT_SECRET') ?: 'GOOGLE_CLIENT_SECRET');
 
 // Must byte-for-byte match the redirect URI registered in Google Console.
-define('GOOGLE_REDIRECT_URI', getenv('GOOGLE_REDIRECT_URI') ?: 'https://styled.great-site.net/styled/php/auth/google-callback.php');
+define('GOOGLE_REDIRECT_URI', env_value('GOOGLE_REDIRECT_URI') ?: 'https://styled.great-site.net/styled/php/auth/google-callback.php');
 
 // Where the browser is sent back to after the OAuth round-trip.
-define('GOOGLE_RETURN_PAGE', getenv('GOOGLE_RETURN_PAGE') ?: 'https://styled.great-site.net/styled/auth.html');
+define('GOOGLE_RETURN_PAGE', env_value('GOOGLE_RETURN_PAGE') ?: 'https://styled.great-site.net/styled/auth.html');
 
 // --- OpenID Connect endpoints (Google's discovery doc) ---------
 define('GOOGLE_AUTH_ENDPOINT',     'https://accounts.google.com/o/oauth2/v2/auth');

@@ -4,7 +4,7 @@ require_once __DIR__ . '/config/env.php';
 function sendEmailViaBrevo($toEmail, $toName, $subject, $htmlContent, $textContent = '') {
     loadEnv();
     // Real key comes from .env (BREVO_API_KEY) — never hardcode it here.
-    $apiKey = getenv('BREVO_API_KEY') ?: 'BREVO_API_KEY';
+    $apiKey = env_value('BREVO_API_KEY') ?: 'BREVO_API_KEY';
 
     $data = [
         'sender' => [
