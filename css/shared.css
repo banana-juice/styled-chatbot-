@@ -48,7 +48,12 @@ body {
   position: relative; /* CSS Z-INDEX: keeps bar above page content */
   z-index: var(--z-top);
 }
+.announcement-bar {
+  gap: 16px; /* keeps the free-shipping text off the Help / Track Order links */
+}
 .announcement-bar .ann-center {
+  min-width: 0;
+  flex-wrap: wrap;
   flex: 1;
   text-align: center;
   display: flex;
@@ -67,6 +72,20 @@ body {
   font-size: 13px;
   display: flex;
   gap: 16px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .announcement-bar {
+    padding: 8px 12px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    gap: 10px;
+  }
+  .announcement-bar .ann-right {
+    font-size: 11px;
+    gap: 8px;
+  }
 }
 .announcement-bar a,
 .ann-right a {
@@ -1277,4 +1296,41 @@ footer {
   .trust-sub {
     font-size: 9px;
   }
+}
+
+/* ---- SOLD-OUT STATES (storefront cards + product modal) ---- */
+.product-card.sold-out .product-img-wrap img {
+  filter: grayscale(0.85);
+  opacity: 0.55;
+}
+.product-card.sold-out .product-name,
+.product-card.sold-out .product-price {
+  color: var(--text-muted);
+}
+.sold-out-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  background: var(--brown-dark);
+  color: #fff;
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  padding: 5px 10px;
+  border-radius: 2px;
+}
+.btn-cart:disabled,
+.btn-cart[aria-disabled="true"],
+.pm-add-cart:disabled {
+  background: #cfc6bc;
+  color: #fff;
+  cursor: not-allowed;
+  opacity: 0.85;
+  pointer-events: none;
+}
+.pm-soldout-note {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
 }

@@ -9,6 +9,15 @@ function getStatusClass(status) {
   return map[status] || "status-processing";
 }
 
+// Small suffix on the status pill so an unpaid / failed order is never
+// mistaken for a confirmed one. A cancelled order already says "Cancelled".
+function paymentSuffix(order) {
+  if ((order.status || "").toLowerCase() === "cancelled") return "";
+  if (order.payment_status === "failed") return " · Payment failed";
+  if (order.payment_status === "unpaid" || order.payment_status === "processing") return " · Unpaid";
+  return "";
+}
+
 // ── INIT USER INFO ───────────────────────────
 function initUserInfo() {
   const user = getCurrentUser();
@@ -20,7 +29,7 @@ function initUserInfo() {
   const avatarEl = document.getElementById("os-avatar");
   if (nameEl) {
     const fullName = user.full_name || user.name || "Guest";
-    nameEl.innerHTML = `<em>${fullName.split(" ")[0]}</em>`;
+    nameEl.innerHTML = `<em>${escapeHtml(fullName.split(" ")[0])}</em>`;
   }
   if (avatarEl) {
     const fullName = user.full_name || user.name;
@@ -92,17 +101,17 @@ async function renderOrderList() {
       const thumbSrc = firstItem?.img || "";
       const itemCount = order.items?.length || 1;
       const thumbHTML = thumbSrc
-        ? `<img class="order-thumb" src="${thumbSrc}" alt="${firstItem?.name || ""}" onerror="this.style.display='none'" />`
+        ? `<img class="order-thumb" src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(firstItem?.name || "")}" onerror="this.style.display='none'" />`
         : `<div class="order-thumb-placeholder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/></svg></div>`;
       return `
-      <div class="order-row" data-order-id="${order.id}">
+      <div class="order-row" data-order-id="${escapeHtml(order.id)}">
         ${thumbHTML}
         <div class="order-info">
-          <p class="order-num">${order.id}</p>
-          <p class="order-meta">${order.date} &bull; ${itemCount} item${itemCount !== 1 ? "s" : ""}</p>
+          <p class="order-num">${escapeHtml(order.id)}</p>
+          <p class="order-meta">${escapeHtml(order.date_time || order.date)} &bull; ${itemCount} item${itemCount !== 1 ? "s" : ""}</p>
         </div>
-        <p class="order-price">${order.total}</p>
-        <span class="order-status ${getStatusClass(order.status)}">${order.status}${order.payment_status === "unpaid" || order.payment_status === "failed" ? " · Unpaid" : ""}</span>
+        <p class="order-price">${escapeHtml(order.total)}</p>
+        <span class="order-status ${getStatusClass(order.status)}">${escapeHtml(order.status)}${paymentSuffix(order)}</span>
         <div class="order-arrow">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
             <polyline points="9 18 15 12 9 6"/>
@@ -161,13 +170,13 @@ function renderTrackingStepper(trackingData) {
       const isDone = i < activeIdx;
       const isActive = i === activeIdx;
       const cls = isDone ? "ts-step done" : isActive ? "ts-step active" : "ts-step";
-      return `<div class="${cls}"><div class="ts-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><p class="ts-label">${step.label}</p><p class="ts-date">${step.date !== "—" ? step.date : ""}</p></div>`;
+      return `<div class="${cls}"><div class="ts-dot"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg></div><p class="ts-label">${escapeHtml(step.label)}</p><p class="ts-date">${escapeHtml(step.datetime || (step.date !== "—" ? step.date : ""))}</p></div>`;
     })
     .join("");
 
   let metaHTML = "";
   if (trackingNumber || estimatedDelivery) {
-    metaHTML = `<div class="ts-meta-bar">${trackingNumber ? `<span class="ts-meta-item"><span class="ts-meta-label">Tracking #</span><strong>${trackingNumber}</strong></span>` : ""}${estimatedDelivery ? `<span class="ts-meta-item"><span class="ts-meta-label">Est. Delivery</span><strong>${estimatedDelivery}</strong></span>` : ""}</div>`;
+    metaHTML = `<div class="ts-meta-bar">${trackingNumber ? `<span class="ts-meta-item"><span class="ts-meta-label">Tracking #</span><strong>${escapeHtml(trackingNumber)}</strong></span>` : ""}${estimatedDelivery ? `<span class="ts-meta-item"><span class="ts-meta-label">Est. Delivery</span><strong>${escapeHtml(estimatedDelivery)}</strong></span>` : ""}</div>`;
   }
   stepper.innerHTML = metaHTML + stepsHTML;
 }
@@ -182,7 +191,8 @@ function openOrderDetail(order) {
   statusBadge.textContent = order.status;
   statusBadge.className = `od-status-badge ${getStatusClass(order.status)}`;
 
-  document.getElementById("od-date").textContent = order.date;
+  document.getElementById("od-date").textContent = order.date_time || order.date;
+  renderOrderTimes(order);
   const itemCount = order.items?.length || 1;
   document.getElementById("od-items-count").textContent = `${itemCount} item${itemCount !== 1 ? "s" : ""}`;
   document.getElementById("od-total").textContent = order.total;
@@ -206,19 +216,46 @@ function openOrderDetail(order) {
   renderTrackingStepper(trackingData);
 
   renderOrderItems(order.items || []);
-  document.getElementById("od-address").innerHTML = (order.shipping?.address || "—").replace(/\n/g, "<br>");
+  document.getElementById("od-address").innerHTML = escapeHtml(order.shipping?.address || "—").replace(/\n/g, "<br>");
   document.getElementById("od-subtotal").textContent = order.subtotal || "₱0.00";
   document.getElementById("od-shipping").textContent = order.shipping?.cost_display || "FREE";
+  const discRow = document.getElementById("od-discount-row");
+  const taxRow = document.getElementById("od-tax-row");
+  if (discRow) {
+    discRow.style.display = order.discount_display ? "" : "none";
+    document.getElementById("od-discount").textContent = order.discount_display || "";
+  }
+  if (taxRow) {
+    taxRow.style.display = order.tax_display ? "" : "none";
+    document.getElementById("od-tax").textContent = order.tax_display || "";
+  }
   document.getElementById("od-grand").textContent = order.total;
+}
+
+// Every payment event carries its own server-set timestamp (Asia/Manila).
+function renderOrderTimes(order) {
+  document.getElementById("od-times")?.remove();
+  const rows = [
+    ["Paid", order.paid_at],
+    ["Payment failed", order.failed_at],
+    ["Cancelled", order.cancelled_at],
+  ].filter(([, v]) => v);
+  if (!rows.length) return;
+  const anchor = document.getElementById("od-date");
+  if (!anchor) return;
+  const el = document.createElement("p");
+  el.id = "od-times";
+  el.className = "od-meta-val";
+  el.style.cssText = "font-size:12px;opacity:.75;margin-top:4px;line-height:1.6";
+  el.innerHTML = rows.map(([k, v]) => `${escapeHtml(k)}: ${escapeHtml(v)}`).join("<br>");
+  anchor.insertAdjacentElement("afterend", el);
 }
 
 function renderRetryPaymentButton(order) {
   // Remove any existing button first (re-render on every detail open).
   document.getElementById("od-retry-payment-btn")?.remove();
 
-  const needsRetry =
-    order.payment_status === "unpaid" || order.payment_status === "failed";
-  if (!needsRetry || !order.order_id) return;
+  if (!order.can_retry_payment || !order.order_id) return;
 
   const paymentSection = document.getElementById("od-payment")?.closest("div");
   if (!paymentSection) return;
@@ -229,8 +266,11 @@ function renderRetryPaymentButton(order) {
   btn.style.marginTop = "10px";
   btn.style.fontSize = "12px";
   btn.style.padding = "10px 20px";
-  btn.textContent =
-    order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+  const retryLabel =
+    order.payment_status === "unpaid" || order.payment_status === "processing"
+      ? "Complete Payment"
+      : "Retry Payment";
+  btn.textContent = retryLabel;
 
   btn.addEventListener("click", async () => {
     btn.disabled = true;
@@ -246,8 +286,7 @@ function renderRetryPaymentButton(order) {
       if (!res.ok || !data.success || !data.checkout_url) {
         alert(data.error || "Could not start payment. Please try again.");
         btn.disabled = false;
-        btn.textContent =
-          order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+        btn.textContent = retryLabel;
         return;
       }
       window.location.href = data.checkout_url;
@@ -255,8 +294,7 @@ function renderRetryPaymentButton(order) {
       console.error("retry payment error:", err);
       alert("A network error occurred. Please try again.");
       btn.disabled = false;
-      btn.textContent =
-        order.payment_status === "failed" ? "Retry Payment" : "Complete Payment";
+      btn.textContent = retryLabel;
     }
   });
 
@@ -274,15 +312,15 @@ function renderOrderItems(items) {
     .map(
       (item) => `
     <div class="od-item-row">
-      <img class="od-item-img" src="${item.img || ""}" alt="${item.product_name || "Product"}" onerror="this.style.opacity='0'" />
+      <img class="od-item-img" src="${escapeHtml(item.img || "")}" alt="${escapeHtml(item.product_name || "Product")}" onerror="this.style.opacity='0'" />
       <div class="od-item-info">
-        <p class="od-item-name">${item.product_name || "Product"}</p>
+        <p class="od-item-name">${escapeHtml(item.product_name || "Product")}</p>
         <div class="od-item-meta">
-          ${item.size && item.size !== "—" ? `<span>Size: ${item.size}</span>` : ""}
-          <span>Qty: ${item.qty || 1}</span>
+          ${item.size && item.size !== "—" ? `<span>Size: ${escapeHtml(item.size)}</span>` : ""}
+          <span>Qty: ${Number(item.qty) || 1}</span>
         </div>
       </div>
-      <p class="od-item-price">${item.price || "₱0.00"}</p>
+      <p class="od-item-price">${escapeHtml(item.price || "₱0.00")}</p>
     </div>
   `,
     )

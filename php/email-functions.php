@@ -36,7 +36,7 @@ function send_order_status_email($pdo, $orderId, $oldStatus, $newStatus, $tracki
     $items = $itemsStmt->fetchAll();
 
     $orderNumber = $order['order_number'];
-    $customerName = explode(' ', $order['full_name'])[0];
+    $customerName = htmlspecialchars(explode(' ', $order['full_name'])[0], ENT_QUOTES, 'UTF-8');
     $email = $order['email'];
     
     // Calculate subtotal
@@ -70,13 +70,13 @@ function send_order_status_email($pdo, $orderId, $oldStatus, $newStatus, $tracki
     // Build HTML email based on whether it's a tracking-only update
     if ($isTrackingOnly) {
         $subject = "Your Styled order #{$orderNumber} has a new tracking number";
-        $trackingHtml = "<p style='margin:12px 0 0;'><strong>New Tracking Number:</strong> {$trackingNumber}</p>";
+        $trackingHtml = "<p style='margin:12px 0 0;'><strong>New Tracking Number:</strong> " . htmlspecialchars((string) $trackingNumber, ENT_QUOTES, 'UTF-8') . "</p>";
         $intro = "The tracking number for your order <strong>#{$orderNumber}</strong> has been updated.";
         $statusText = null;
     } else {
         $statusText = ucfirst($newStatus);
         $subject = "Your Styled order #{$orderNumber} has been {$statusText}";
-        $trackingHtml = $trackingNumber ? "<p style='margin:12px 0 0;'><strong>Tracking Number:</strong> {$trackingNumber}</p>" : '';
+        $trackingHtml = $trackingNumber ? "<p style='margin:12px 0 0;'><strong>Tracking Number:</strong> " . htmlspecialchars((string) $trackingNumber, ENT_QUOTES, 'UTF-8') . "</p>" : '';
         $intro = "Your order <strong>#{$orderNumber}</strong> status has been updated to <strong style='color:#3a6b4a;'>{$statusText}</strong>.";
     }
     
@@ -90,7 +90,7 @@ function send_order_status_email($pdo, $orderId, $oldStatus, $newStatus, $tracki
     $htmlBody .= "<tr><td style='padding:40px;'><h2 style='margin:0 0 8px;font-size:22px;font-weight:400;'>Order Update</h2>";
     $htmlBody .= "<p style='margin:0 0 24px;color:#7a6a5a;font-size:14px;'>Hi {$customerName},</p>";
     $htmlBody .= "<p style='margin:0 0 16px;font-size:14px;'>{$intro}</p>";
-    if ($trackingNumber) $htmlBody .= "<p style='margin:12px 0 0;'><strong>Tracking Number:</strong> {$trackingNumber}</p>";
+    if ($trackingNumber) $htmlBody .= "<p style='margin:12px 0 0;'><strong>Tracking Number:</strong> " . htmlspecialchars((string) $trackingNumber, ENT_QUOTES, 'UTF-8') . "</p>";
     $htmlBody .= "<div style='background:#faf7f4;border-radius:6px;padding:16px 20px;margin:28px 0;'><p style='margin:0;font-size:13px;color:#7a6a5a;'>Order #{$orderNumber}</p><p style='margin:4px 0 0;font-size:18px;font-weight:500;'>{$grandDisplay}</p></div>";
     
     $htmlBody .= "<table width='100%' cellpadding='0' cellspacing='0' style='font-size:13px;margin-bottom:20px;'><thead><tr style='background:#faf7f4;'><th style='padding:10px 8px;text-align:left;'>Item</th><th style='padding:10px 8px;text-align:center;'>Qty</th><th style='padding:10px 8px;text-align:right;'>Unit Price</th><th style='padding:10px 8px;text-align:right;'>Total</th></tr></thead><tbody>{$itemsHtml}</tbody></table>";

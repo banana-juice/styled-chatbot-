@@ -11,9 +11,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 header('Content-Type: application/json');
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/stock.php';
 
 $pdo = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
+
+// Cancel abandoned card/GCash orders whose stock hold has run out, so the
+// counts the storefront shows reflect units that are really available.
+if ($method === 'GET') {
+    stock_ensure_schema($pdo);
+    stock_release_stale_holds($pdo);
+}
 
 if ($method !== 'GET') {
     http_response_code(405);

@@ -8,7 +8,7 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/shared.css?v=20260923" />
+    <link rel="stylesheet" href="css/shared.css?v=20261007b" />
     <link rel="stylesheet" href="css/chatbot.css?v=20260923" />
     <link rel="stylesheet" href="css/orders.css?v=20260923" />
     <style>
@@ -264,8 +264,14 @@
               <div class="od-total-row">
                 <span>Subtotal</span><span id="od-subtotal">—</span>
               </div>
+              <div class="od-total-row" id="od-discount-row" style="display:none">
+                <span>Discount</span><span id="od-discount">—</span>
+              </div>
               <div class="od-total-row">
                 <span>Shipping</span><span id="od-shipping">—</span>
+              </div>
+              <div class="od-total-row" id="od-tax-row" style="display:none">
+                <span>VAT</span><span id="od-tax">—</span>
               </div>
               <div class="od-total-row od-total-grand">
                 <span>Total</span><span id="od-grand">—</span>
@@ -349,9 +355,11 @@
 
     <button class="back-to-top" id="back-to-top" title="Back to top">↑</button>
 
-    <script src="js/main.js?v=20261003"></script>
+    <script src="js/safe.js?v=20261007b"></script>
+
+    <script src="js/main.js?v=20261007b"></script>
     <script src="js/chatbot.js?v=20260923"></script>
-    <script src="js/orders.js?v=20260923"></script>
+    <script src="js/orders.js?v=20261007b"></script>
 
     <!-- ══════════════════════════════════════════════════
      AUTH GUARD + SESSION SIGN-OUT for orders.html

@@ -2,6 +2,7 @@
 
 // ========== GLOBAL VARIABLES ==========
 let currentPage = "dashboard";
+let ordersSort = "asc"; // oldest first (FIFO); dropdown can flip it
 let ordersPage = 1,
   ordersStatusFilter = "",
   ordersSearch = "";
@@ -50,15 +51,7 @@ function setButtonLoading(btn, isLoading, originalText = null) {
   }
 }
 // ========== HELPER FUNCTIONS ==========
-function escapeHtml(str) {
-  if (!str) return "";
-  return str.replace(/[&<>]/g, function (m) {
-    if (m === "&") return "&amp;";
-    if (m === "<") return "&lt;";
-    if (m === ">") return "&gt;";
-    return m;
-  });
-}
+// escapeHtml / fmtManila / parseServerDate come from js/safe.js (loaded first).
 
 function formatPrice(n) {
   return (
@@ -68,6 +61,22 @@ function formatPrice(n) {
       maximumFractionDigits: 2,
     })
   );
+}
+
+// Real payment status, from orders.payment_status (set by the PayMongo
+// webhook). This used to be guessed from payment_method, so every card /
+// GCash order showed "Paid" whether or not it had actually been paid.
+function paymentStatusLabel(o) {
+  const map = {
+    paid: "Paid",
+    unpaid: "Unpaid",
+    processing: "Processing",
+    failed: "Failed",
+    cancelled: "Cancelled",
+    refunded: "Refunded",
+    cod: "Pending",
+  };
+  return map[o.payment_status] || (o.payment_method === "cod" ? "Pending" : "Unpaid");
 }
 
 function statusBadge(s) {
@@ -250,10 +259,10 @@ async function renderDashboard() {
       body.innerHTML = data.orders
         .map(
           (o) => `
-        <tr style="cursor:pointer" onclick="openOrderDetail('${o.order_number}')">
-          <td><span style="font-weight:500">#${o.order_number}</span></td>
-          <td>${o.customer_name || "—"}</td>
-          <td class="text-muted">${new Date(o.created_at).toLocaleDateString()}</td>
+        <tr style="cursor:pointer" data-order="${escapeHtml(o.order_number)}" onclick="openOrderDetail(this.dataset.order)">
+          <td><span style="font-weight:500">#${escapeHtml(o.order_number)}</span></td>
+          <td>${escapeHtml(o.customer_name) || "—"}</td>
+          <td class="text-muted">${escapeHtml(fmtManila(o.created_at))}</td>
           <td>${statusBadge(o.status)}</td>
           <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
           <td><button class="ellipsis-btn">···</button></td>
@@ -280,7 +289,7 @@ async function renderDashboard() {
             .map(
               (i) => `
         <div class="metric-row">
-          <div>${i.product_name} ${i.size ? `(${i.size})` : ""}</div>
+          <div>${escapeHtml(i.product_name)} ${i.size ? `(${escapeHtml(i.size)})` : ""}</div>
           <div style="color:var(--red)">${i.stock_qty} left</div>
         </div>
       `,
@@ -339,6 +348,7 @@ async function renderOrdersTable() {
     limit: ORDERS_PER_PAGE,
     status: ordersStatusFilter,
     search: ordersSearch,
+    sort: ordersSort,
   });
   try {
     const data = await fetchJSON(`${API}/orders.php?${params}`);
@@ -350,10 +360,10 @@ async function renderOrdersTable() {
       body.innerHTML = data.orders
         .map(
           (o) => `
-        <tr style="cursor:pointer" onclick="openOrderDetail('${o.order_number}')">
-          <td><span style="font-weight:500">#${o.order_number}</span></td>
-          <td><div class="flex-center gap-8"><div class="customer-avatar">${initials(o.customer_name)}</div>${o.customer_name || "—"}</div></td>
-          <td class="text-muted">${new Date(o.created_at).toLocaleDateString()}</td>
+        <tr style="cursor:pointer" data-order="${escapeHtml(o.order_number)}" onclick="openOrderDetail(this.dataset.order)">
+          <td><span style="font-weight:500">#${escapeHtml(o.order_number)}</span></td>
+          <td><div class="flex-center gap-8"><div class="customer-avatar">${escapeHtml(initials(o.customer_name))}</div>${escapeHtml(o.customer_name) || "—"}</div></td>
+          <td class="text-muted">${escapeHtml(fmtManila(o.created_at))}</td>
           <td>${statusBadge(o.status)}</td>
           <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
           <td><button class="ellipsis-btn">···</button></td>
@@ -379,6 +389,12 @@ function filterOrders(q) {
   ordersPage = 1;
   renderOrdersTable();
 }
+function sortOrders(dir) {
+  ordersSort = dir === "desc" ? "desc" : "asc";
+  ordersPage = 1;
+  renderOrdersTable();
+}
+
 function filterOrdersByStatus(s) {
   ordersStatusFilter = s;
   ordersPage = 1;
@@ -403,22 +419,35 @@ async function openOrderDetail(orderNumber) {
       o.status,
     );
     document.getElementById("detail-payment-badge").innerHTML = statusBadge(
-      o.payment_method === "cod" ? "Pending" : "Paid",
+      paymentStatusLabel(o),
     );
+    const timesEl = document.getElementById("detail-times");
+    if (timesEl) {
+      timesEl.innerHTML = [
+        ["Placed", o.created_at],
+        ["Paid", o.paid_at],
+        ["Payment failed", o.failed_at],
+        ["Cancelled", o.cancelled_at],
+        ["Last updated", o.updated_at],
+      ]
+        .filter(([, v]) => v)
+        .map(([k, v]) => `<span style="margin-right:18px"><strong>${k}:</strong> ${escapeHtml(fmtManila(v))}</span>`)
+        .join("");
+    }
     const customerDiv = document.getElementById("detail-customer");
     if (customerDiv)
-      customerDiv.innerHTML = `<div class="flex-center gap-12"><div class="customer-avatar">${initials(o.customer_name)}</div><div><div style="font-weight:500">${o.customer_name || "—"}</div><div class="text-sm text-muted">${o.customer_email || ""}</div></div></div>`;
+      customerDiv.innerHTML = `<div class="flex-center gap-12"><div class="customer-avatar">${escapeHtml(initials(o.customer_name))}</div><div><div style="font-weight:500">${escapeHtml(o.customer_name) || "—"}</div><div class="text-sm text-muted">${escapeHtml(o.customer_email || "")}</div></div></div>`;
     const addrEl = document.getElementById("detail-address");
     if (addrEl)
       addrEl.innerHTML =
-        [o.street, o.city, o.province, o.zip_code].filter(Boolean).join(", ") ||
+        escapeHtml([o.street, o.city, o.province, o.zip_code].filter(Boolean).join(", ")) ||
         "No address provided";
     const itemsEl = document.getElementById("detail-items");
     if (itemsEl)
       itemsEl.innerHTML = (o.items || [])
         .map(
           (item) =>
-            `<div class="metric-row"><div>${item.product_name}${item.size ? " (" + item.size + ")" : ""} × ${item.qty}</div><div>${formatPrice(item.unit_price * item.qty)}</div></div>`,
+            `<div class="metric-row"><div>${escapeHtml(item.product_name)}${item.size ? " (" + escapeHtml(item.size) + ")" : ""} × ${Number(item.qty)}</div><div>${formatPrice(item.unit_price * item.qty)}</div></div>`,
         )
         .join("");
     const subtotal = (o.items || []).reduce(
@@ -430,6 +459,17 @@ async function openOrderDetail(orderNumber) {
     document.getElementById("detail-total-price").innerHTML = formatPrice(
       o.total_amount,
     );
+
+    // Real shipping + VAT for this order (was a hardcoded "₱150.00").
+    {
+      const ship = Number(o.shipping_fee) || 0;
+      const disc = Number(o.discount) || 0;
+      const tax = Math.max(0, Number(o.total_amount) - subtotal + disc - ship);
+      const elShip = document.getElementById("detail-shipping");
+      if (elShip) elShip.textContent = ship === 0 ? "FREE" : formatPrice(ship);
+      const elTax = document.getElementById("detail-tax");
+      if (elTax) elTax.textContent = tax > 0.004 ? formatPrice(tax) : "—";
+    }
 
     // ── Update discount ──────────────────────────────────────────────
     const discountAmount = o.discount || 0;
@@ -458,7 +498,7 @@ async function openOrderDetail(orderNumber) {
                 <div class="timeline-dot"></div>
                 <div class="timeline-content">
                   <div class="timeline-label">${escapeHtml(t.step_label)}</div>
-                  <div class="timeline-time">${new Date(t.occurred_at).toLocaleString()}</div>
+                  <div class="timeline-time">${escapeHtml(fmtManila(t.occurred_at))}</div>
                   ${t.note ? `<div class="text-sm text-muted">${escapeHtml(t.note)}</div>` : ""}
                 </div>
               </div>
@@ -487,11 +527,11 @@ async function openOrderDetail(orderNumber) {
       actionsDiv.innerHTML = `
         <div class="card-title mb-16">Update Status</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap">
-          <select class="filter-select" id="status-select" style="flex:1">
+          <select class="filter-select" id="status-select" style="flex:1" ${o.status === "cancelled" ? "disabled" : ""}>
             ${["processing", "shipped", "delivered"].map((s) => `<option value="${s}" ${s === o.status ? "selected" : ""}>${s.charAt(0).toUpperCase() + s.slice(1)}</option>`).join("")}
           </select>
-          <input class="form-input" type="text" id="tracking-input" placeholder="Tracking number" value="${o.tracking_number || ""}" style="width:180px" />
-          <button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${o.order_id})">Update</button>
+          <input class="form-input" type="text" id="tracking-input" placeholder="Tracking number" value="${escapeHtml(o.tracking_number || "")}" style="width:180px" ${o.status === "cancelled" ? "disabled" : ""} />
+          <button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${Number(o.order_id)})" ${o.status === "cancelled" ? "disabled title=\"Cancelled orders cannot be updated\"" : ""}>Update</button>
         </div>
       `;
     }
@@ -572,12 +612,12 @@ async function renderProductsTable() {
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
     <line x1="7" y1="7" x2="7.01" y2="7"/>
   </svg>
-</div><span style="font-weight:500">${p.name}</span></div></td>
-          <td class="text-muted">${p.category || "—"}</td>
+</div><span style="font-weight:500">${escapeHtml(p.name)}</span></div></td>
+          <td class="text-muted">${escapeHtml(p.category) || "—"}</td>
           <td>${formatPrice(p.price)}</td>
           <td><div class="stock-bar-wrap"><span class="stock-num">${stock}</span><div class="progress-bar"><div class="progress-fill" style="width:${Math.min(100, (stock / 30) * 100)}%"></div></div></div></td>
           <td>${statusBadge(statLbl)}</td>
-          <td><button class="btn btn-outline btn-sm" onclick="openStockEditor(${p.product_id},'${p.name.replace(/'/g, "\\'")}',${stock})">Update Stock</button></td>
+          <td><button class="btn btn-outline btn-sm" data-name="${escapeHtml(p.name)}" onclick="openStockEditor(${Number(p.product_id)}, this.dataset.name)">Update Stock</button></td>
          </tr>`;
         })
         .join("");
@@ -756,11 +796,11 @@ async function renderCustomersTable() {
         .map(
           (c) => `
         <tr style="cursor:pointer" onclick="openCustomerProfile(${c.user_id})">
-          <td><div class="flex-center gap-12"><div class="customer-avatar">${initials(c.full_name)}</div><span style="font-weight:500">${c.full_name}</span></div></td>
-          <td class="text-muted">${c.email}</td>
+          <td><div class="flex-center gap-12"><div class="customer-avatar">${escapeHtml(initials(c.full_name))}</div><span style="font-weight:500">${escapeHtml(c.full_name)}</span></div></td>
+          <td class="text-muted">${escapeHtml(c.email)}</td>
           <td>${c.order_count}</td>
           <td>${formatPrice(c.total_spent)}</td>
-          <td class="text-muted">${new Date(c.created_at).toLocaleDateString()}</td>
+          <td class="text-muted">${fmtManila(c.created_at, MANILA_DATE_ONLY)}</td>
           <td><button class="ellipsis-btn">···</button></td>
          </tr>
       `,
@@ -801,8 +841,7 @@ async function openCustomerProfile(id) {
 
       const sinceEl = document.getElementById("profile-since");
 if (sinceEl && c.created_at) {
-  const date = new Date(c.created_at);
-  const formatted = date.toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+  const formatted = fmtManila(c.created_at, { month: "short", year: "numeric" });
   sinceEl.textContent = formatted;
 }
       
@@ -830,7 +869,7 @@ if (sinceEl && c.created_at) {
     const addrDiv = document.getElementById("customer-shipping-address");
     if (addrDiv) {
       if (c.address && c.address.street) {
-        addrDiv.innerHTML = `${c.address.street}<br>${c.address.city}, ${c.address.province}<br>${c.address.zip_code}`;
+        addrDiv.innerHTML = `${escapeHtml(c.address.street)}<br>${escapeHtml(c.address.city)}, ${escapeHtml(c.address.province)}<br>${escapeHtml(c.address.zip_code)}`;
       } else {
         addrDiv.innerHTML = "No default address on file.";
       }
@@ -845,7 +884,7 @@ if (sinceEl && c.created_at) {
               (o) =>
                 `<tr onclick="openOrderDetail('${o.order_number}')" style="cursor:pointer">
                     <td>#${o.order_number}</td>
-                    <td class="text-muted">${new Date(o.created_at).toLocaleDateString()}</td>
+                    <td class="text-muted">${fmtManila(o.created_at, MANILA_DATE_ONLY)}</td>
                     <td>${statusBadge(o.status)}</td>
                     <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
                    </tr>`,
@@ -938,7 +977,7 @@ async function renderPromotions() {
             : "—";
           return `
           <tr>
-            <td><span style="font-weight:600">${p.code}</span></td>
+            <td><span style="font-weight:600">${escapeHtml(p.code)}</span></td>
             <td>${p.discount_type === "percent" ? "Percentage" : "Fixed"}</td>
             <td>${discount}</td>
             <td>${minOrder}</td>
@@ -985,7 +1024,7 @@ async function renderInventory() {
             <td>${escapeHtml(item.category || "—")}</td>
             <td style="color:${isOut ? "var(--red)" : isLow ? "var(--gold)" : "var(--brown-300)"}">${qty}</td>
             <td>${statusBadge(status)}</td>
-            <td><button class="btn btn-outline btn-sm" onclick="openSizeStockModal(${item.size_id}, '${escapeHtml(item.product_name)}', '${escapeHtml(item.size)}', ${qty})">Update</button></td>
+            <td><button class="btn btn-outline btn-sm" data-name="${escapeHtml(item.product_name)}" data-size="${escapeHtml(item.size)}" onclick="openSizeStockModal(${Number(item.size_id)}, this.dataset.name, this.dataset.size, ${Number(qty)})">Update</button></td>
            </tr>`;
         })
         .join("");
@@ -1091,7 +1130,7 @@ async function renderContactMessages() {
           <td>${escapeHtml(m.subject)}</td>
           <td class="text-muted text-sm" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(m.message)}</td>
           <td>${statusBadge(m.status)}</td>
-          <td class="text-muted">${new Date(m.sent_at).toLocaleDateString()}</td>
+          <td class="text-muted">${fmtManila(m.sent_at, MANILA_DATE_ONLY)}</td>
           <td>
             <div class="flex-center gap-6">
               <button class="btn btn-outline btn-sm" onclick="viewContactMessage(${m.message_id})">View</button>
@@ -1323,7 +1362,7 @@ async function populateUserInfo() {
         currentPage === "dashboard"
       ) {
         document.getElementById("page-title").innerHTML =
-          `Welcome back, <span>${u.full_name.split(" ")[0]}</span>`;
+          `Welcome back, <span>${escapeHtml(u.full_name.split(" ")[0])}</span>`;
       }
     }
   } catch (err) {
@@ -1347,7 +1386,7 @@ async function exportCustomers() {
       c.email,
       c.order_count,
       c.total_spent,
-      new Date(c.created_at).toLocaleDateString("en-PH"),
+      fmtManila(c.created_at, MANILA_DATE_ONLY),
       (c.admin_notes || "").replace(/,/g, ";") // escape commas
     ]);
 

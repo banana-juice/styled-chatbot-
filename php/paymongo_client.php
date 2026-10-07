@@ -114,7 +114,26 @@ function paymongo_create_checkout_session(
 }
 
 function paymongo_retrieve_checkout_session(string $sessionId): array {
-    return paymongo_request('GET', '/v2/checkout_sessions/' . $sessionId);
+    // Retrieval lives under /v1 (verified against the live test API: the
+    // /v2 path returns "The requested route does not exist"), even though
+    // sessions are created through /v2.
+    return paymongo_request('GET', '/v1/checkout_sessions/' . $sessionId);
+}
+
+/**
+ * Best-effort: expire a still-open checkout session so a cancelled order
+ * can't be paid later from the old PayMongo page. Never throws — if
+ * PayMongo is unreachable the webhook's late-payment handling covers it.
+ */
+function paymongo_expire_checkout_session_quietly(?string $sessionId): void {
+    if (!$sessionId) {
+        return;
+    }
+    try {
+        paymongo_request('POST', '/v1/checkout_sessions/' . $sessionId . '/expire');
+    } catch (Throwable $e) {
+        error_log('PayMongo expire session ' . $sessionId . ': ' . $e->getMessage());
+    }
 }
 
 /**
@@ -125,7 +144,7 @@ function paymongo_retrieve_checkout_session(string $sessionId): array {
  * which secret key is configured.
  */
 function paymongo_verify_webhook_signature(string $rawBody, string $signatureHeader): bool {
-    if ($signatureHeader === '') {
+    if ($signatureHeader === '' || PAYMONGO_WEBHOOK_SECRET === '') {
         return false;
     }
 

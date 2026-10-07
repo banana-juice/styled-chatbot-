@@ -563,6 +563,28 @@
   margin-bottom: 32px;
 }
 
+/* Tablet / phone: the fixed "1fr 420px" two-column grid had no breakpoint, so
+   on a phone the 420px form column squeezed the cart into a sliver. Stack
+   the order summary above the payment form instead. */
+@media (max-width: 900px) {
+  .checkout-wrapper {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+  .checkout-left {
+    padding: 32px 24px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .checkout-right {
+    position: static;
+    width: auto;
+    max-width: 100%;
+    padding: 32px 24px;
+    border-left: 0;
+  }
+}
+
 /* MOBILE FIXES - checkout.css */
 @media (max-width: 480px) {
   .checkout-left, .checkout-right {
@@ -575,9 +597,39 @@
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  .order-table {
-    min-width: 480px;
+  /* Was min-width:480px, which forced the whole left column wider than a
+     phone and pushed the page (and the Continue Shopping button) off the
+     right edge. The cart now stacks into one card per item instead. */
+  .checkout-left { min-width: 0; }
+  .order-table-wrap { overflow-x: visible; }
+  .order-table { min-width: 0; display: block; }
+  .order-table thead { display: none; }
+  .order-table tbody { display: block; }
+  .order-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 12px;
+    align-items: center;
+    padding: 14px 0;
   }
+  .order-table tbody td {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    border: 0;
+  }
+  .order-table tbody td:first-child { grid-column: 1 / -1; }
+  .order-table tbody td[data-label]::before {
+    content: attr(data-label);
+    font-size: 9px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-right: 8px;
+  }
+  .order-table tbody td:last-child { grid-column: 1 / -1; justify-content: flex-end; }
+  .cart-empty .btn-primary { max-width: 100%; box-sizing: border-box; }
   .item-thumb, .item-thumb-placeholder {
     width: 40px;
     height: 48px;

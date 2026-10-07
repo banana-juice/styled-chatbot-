@@ -858,11 +858,9 @@
                   <option>Refunded</option>
                   <option>Cancelled</option>
                 </select>
-                <select class="filter-select">
-                  <option>All Payment Status</option>
-                  <option>Paid</option>
-                  <option>Unpaid</option>
-                  <option>Refunded</option>
+                <select class="filter-select" id="orders-sort" onchange="sortOrders(this.value)" title="Order the list by date placed">
+                  <option value="asc" selected>Oldest first (FIFO)</option>
+                  <option value="desc">Newest first</option>
                 </select>
                 <input
                   type="date"
@@ -914,6 +912,7 @@
                   align-items: center;
                   gap: 12px;
                   margin-bottom: 20px;
+                  flex-wrap: wrap;
                 "
               >
                 <div
@@ -925,6 +924,7 @@
                 </div>
                 <span id="detail-status-badge" class="badge"></span>
                 <span id="detail-payment-badge" class="badge"></span>
+                <div id="detail-times" class="text-sm text-muted" style="flex-basis: 100%; line-height: 1.7"></div>
               </div>
               <div class="order-detail-grid">
                 <div style="display: flex; flex-direction: column; gap: 16px">
@@ -944,7 +944,11 @@
                       </div>
                       <div class="metric-row">
                         <span class="text-muted">Shipping</span
-                        ><span>₱150.00</span>
+                        ><span id="detail-shipping">—</span>
+                      </div>
+                      <div class="metric-row" id="detail-tax-row">
+                        <span class="text-muted">VAT</span
+                        ><span id="detail-tax">—</span>
                       </div>
                       <div class="metric-row">
                         <span class="text-muted">Discount</span>
@@ -1522,6 +1526,7 @@
     <!-- /app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/staff.js?v=20260923"></script>
+    <script src="js/safe.js?v=20261007b"></script>
+    <script src="js/staff.js?v=20261007b"></script>
   </body>
 </html>

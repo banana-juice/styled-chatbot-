@@ -13,13 +13,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../stock.php';
 
-requireAuth();
+$user   = requireAuth();
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getPDO();
+stock_ensure_schema($pdo);
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 if ($method === 'GET') {
+    // Release abandoned-payment holds first so the counts shown are real.
+    stock_release_stale_holds($pdo);
     $category = $_GET['category'] ?? '';
     $status   = $_GET['status']   ?? '';
     $search   = $_GET['search']   ?? '';
@@ -73,8 +77,33 @@ if ($method === 'PUT') {
         exit;
     }
 
-    $pdo->prepare("UPDATE product_sizes SET stock_qty = ? WHERE size_id = ?")
-        ->execute([(int) $body['stock_qty'], (int) $body['size_id']]);
+    // Whole-number, non-negative only. (int) 'abc' is 0 and (int) '-50' is -50,
+    // so the old cast silently wiped stock on junk and accepted negatives.
+    $qtyRaw = $body['stock_qty'];
+    if ((!is_int($qtyRaw) && !(is_string($qtyRaw) && preg_match('/^\d+$/', $qtyRaw)))
+        || (int) $qtyRaw < 0 || (int) $qtyRaw > 1000000) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'stock_qty must be a whole number from 0 to 1,000,000.']);
+        exit;
+    }
+    $newQty = (int) $qtyRaw;
+
+    $pdo->beginTransaction();
+    $row = $pdo->prepare('SELECT product_id, size, stock_qty FROM product_sizes WHERE size_id = ? FOR UPDATE');
+    $row->execute([(int) $body['size_id']]);
+    $cur = $row->fetch(PDO::FETCH_ASSOC);
+    if (!$cur) {
+        $pdo->rollBack();
+        http_response_code(404);
+        echo json_encode(['success' => false, 'error' => 'Inventory row not found.']);
+        exit;
+    }
+    $pdo->prepare('UPDATE product_sizes SET stock_qty = ? WHERE size_id = ?')->execute([$newQty, (int) $body['size_id']]);
+    if ((int) $cur['stock_qty'] !== $newQty) {
+        stock_log($pdo, (int) $cur['product_id'], $cur['size'], $newQty - (int) $cur['stock_qty'],
+                  (int) $cur['stock_qty'], $newQty, 'admin_adjust', null, $user['user_id'], 'Inventory page edit');
+    }
+    $pdo->commit();
 
     echo json_encode(['success' => true]);
     exit;

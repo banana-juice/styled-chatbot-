@@ -27,6 +27,7 @@ error_reporting(E_ALL);
 
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/stock.php';
 require_once __DIR__ . '/paymongo_client.php';
 
 header('Content-Type: application/json');
@@ -59,12 +60,14 @@ if ($order_id <= 0) {
 
 try {
     $pdo = getPDO();
+    stock_ensure_schema($pdo);
+    stock_release_stale_holds($pdo);
 
     // Order must belong to the logged-in user and must actually need
     // online payment (never let this be called for a COD order).
     $stmt = $pdo->prepare('
         SELECT o.order_id, o.order_number, o.grand_total, o.payment_method,
-               o.payment_status, u.email, u.full_name
+               o.payment_status, o.status, o.payment_reference, u.email, u.full_name
         FROM orders o
         JOIN users u ON u.user_id = o.user_id
         WHERE o.order_id = :oid AND o.user_id = :uid
@@ -94,6 +97,53 @@ try {
         http_response_code(400);
         echo json_encode(['error' => 'This order has already been paid']);
         exit;
+    }
+
+    // A cancelled order (customer cancelled, or the stock hold expired) has
+    // already given its items back to the shelf, so it can't be paid any more.
+    if ($order['status'] === 'cancelled') {
+        // A payment-side cancel (hold expired / session expired / customer
+        // backed out) can be retried if its items can be taken off the shelf
+        // again. A cancel made by staff stays cancelled.
+        if ($order['payment_status'] === 'paid' || !order_can_reopen_for_payment($pdo, (int) $order['order_id'])) {
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode(['error' => 'This order was cancelled. Please place a new order.', 'code' => 'order_cancelled']);
+            exit;
+        }
+        $pdo->beginTransaction();
+        $locked = $pdo->prepare('SELECT status FROM orders WHERE order_id = ? FOR UPDATE');
+        $locked->execute([$order['order_id']]);
+        if ($locked->fetchColumn() === 'cancelled') {
+            if (!stock_rereserve_order($pdo, (int) $order['order_id'], 'payment retried')) {
+                $pdo->rollBack();
+                ob_end_clean();
+                http_response_code(409);
+                echo json_encode(['error' => 'Sorry, some items in this order are no longer in stock. Please place a new order.', 'code' => 'insufficient_stock']);
+                exit;
+            }
+            $pdo->prepare("UPDATE orders SET status = 'pending', payment_status = 'unpaid', cancelled_at = NULL, failed_at = NULL, payment_reference = NULL WHERE order_id = ?")
+                ->execute([$order['order_id']]);
+            order_timeline_add($pdo, (int) $order['order_id'], 'Order Placed', 'Reopened for payment; items reserved again.');
+            $order['payment_reference'] = null;
+        }
+        $pdo->commit();
+    }
+
+    // Retrying (page refresh, double-click, back button) must not spawn a
+    // second PayMongo session for the same order: reuse the live one.
+    if (!empty($order['payment_reference'])) {
+        try {
+            $existing = paymongo_retrieve_checkout_session($order['payment_reference']);
+            $exAttrs  = $existing['data']['attributes'] ?? [];
+            if (($exAttrs['status'] ?? '') === 'active' && !empty($exAttrs['checkout_url'])) {
+                ob_end_clean();
+                echo json_encode(['success' => true, 'checkout_url' => $exAttrs['checkout_url'], 'reused' => true]);
+                exit;
+            }
+        } catch (PaymongoException $e) {
+            // couldn't look the old session up; fall through and create a new one
+        }
     }
 
     // Map STYLED's payment_method choice to the PayMongo methods to

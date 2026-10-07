@@ -2,26 +2,15 @@
 
 console.log("renderAnalytics() called");
 
-let ordersPaymentFilter = "";   // empty = no filter (All)
+let ordersPaymentFilter = "";
+let ordersSort = "asc"; // oldest first = FIFO work queue; the dropdown can flip it   // empty = no filter (All)
 let currentVariants = [];
 
 // Make sure no direct DELETE calls are made
 window.deleteImageDirect = function () {
   showToast('Use the "Save Images" button to confirm deletion.', "error");
 };
-function escapeHtml(str) {
-  if (!str) return "";
-  return str
-    .replace(/[&<>]/g, function (m) {
-      if (m === "&") return "&amp;";
-      if (m === "<") return "&lt;";
-      if (m === ">") return "&gt;";
-      return m;
-    })
-    .replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, function (c) {
-      return c;
-    });
-}
+// escapeHtml / fmtManila / parseServerDate come from js/safe.js (loaded first).
 /**
  * Wrapper around fetch() that:
  *  - always sends credentials
@@ -186,7 +175,7 @@ function statusBadge(s) {
     replied: "shipped",
   };
   const key = (s || "").toLowerCase();
-  return `<span class="badge badge-${map[key] || "delivered"}">${s}</span>`;
+  return `<span class="badge badge-${map[key] || "delivered"}">${escapeHtml(s)}</span>`;
 }
 
 // Real payment status label, backed by orders.payment_status (set by
@@ -198,6 +187,7 @@ function paymentStatusLabel(o) {
     unpaid: "Unpaid",
     processing: "Processing",
     failed: "Failed",
+    cancelled: "Cancelled",
     refunded: "Refunded",
     cod: "Pending", // cash collected on delivery, not yet in hand
   };
@@ -281,8 +271,8 @@ async function renderDashboard() {
           (o) => `
                     <tr style="cursor:pointer" onclick="openOrderDetail('${o.order_number}')">
                         <td><span style="font-weight:500;color:var(--brown-400)">#${o.order_number}</span></td>
-                        <td>${o.customer_name || "—"}</td>
-                        <td class="text-muted">${new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
+                        <td>${escapeHtml(o.customer_name) || "—"}</td>
+                        <td class="text-muted">${fmtManila(o.created_at, MANILA_DATE_ONLY)}</td>
                         <td>${statusBadge(o.status)}</td>
                         <td>${statusBadge(paymentStatusLabel(o))}</td>
                         <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
@@ -337,7 +327,7 @@ async function renderDashboard() {
                         <div class="flex-center gap-12">
                             <div class="product-thumb" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
                             <div>
-                                <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${p.name}</div>
+                                <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${escapeHtml(p.name)}</div>
                                 <div class="text-sm text-muted">${p.quantity_sold} sold</div>
                             </div>
                         </div>
@@ -362,8 +352,8 @@ async function renderDashboard() {
                               <div class="flex-center gap-12">
                                   <div class="product-thumb" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
                                   <div>
-                                      <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${i.product_name}</div>
-                                      <div class="text-sm text-muted">${i.size} — ${i.category}</div>
+                                      <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${escapeHtml(i.product_name)}</div>
+                                      <div class="text-sm text-muted">${escapeHtml(i.size)} — ${escapeHtml(i.category)}</div>
                                   </div>
                               </div>
                               <div style="font-size:14px;font-weight:500;color:var(--red)">${i.stock_qty} left</div>
@@ -392,7 +382,8 @@ const params = new URLSearchParams({
   limit: ORDERS_PER_PAGE,
   status: ordersStatusFilter,
   search: ordersSearch,
-  payment_status: ordersPaymentFilter,   // <-- add this line
+  payment_status: ordersPaymentFilter,
+  sort: ordersSort,
 });
   try {
     const data = await fetchJSON(`${API}/orders.php?${params}`);
@@ -405,20 +396,20 @@ const params = new URLSearchParams({
       body.innerHTML = data.orders
         .map(
           (o) => `
-        <tr style="cursor:pointer" onclick="openOrderDetail('${o.order_number}')">
-          <td><span style="font-weight:500;color:var(--brown-400)">#${o.order_number}</span></td>
+        <tr style="cursor:pointer" data-order="${escapeHtml(o.order_number)}" onclick="openOrderDetail(this.dataset.order)">
+          <td><span style="font-weight:500;color:var(--brown-400)">#${escapeHtml(o.order_number)}</span></td>
           <td>
             <div class="flex-center gap-8">
-              <div class="customer-avatar">${initials(o.customer_name)}</div>
-              ${o.customer_name || "—"}
+              <div class="customer-avatar">${escapeHtml(initials(o.customer_name))}</div>
+              ${escapeHtml(o.customer_name) || "—"}
             </div>
           </td>
-          <td class="text-muted">${new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
+          <td class="text-muted" title="Placed ${escapeHtml(fmtManila(o.created_at))}">${escapeHtml(fmtManila(o.created_at))}</td>
           <td>${statusBadge(o.status)}</td>
           <td>${statusBadge(paymentStatusLabel(o))}</td>
           <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
           <td><button class="ellipsis-btn">···</button></td>
-        </td>`,
+        </tr>`,
         )
         .join("");
     }
@@ -444,6 +435,12 @@ function filterOrders(q) {
 
 function filterOrdersByStatus(s) {
   ordersStatusFilter = s;
+  ordersPage = 1;
+  renderOrdersTable();
+}
+
+function sortOrders(dir) {
+  ordersSort = dir === "desc" ? "desc" : "asc";
   ordersPage = 1;
   renderOrdersTable();
 }
@@ -483,6 +480,21 @@ async function openOrderDetail(orderNumber) {
     if (payBadgeEl)
       payBadgeEl.outerHTML = `<span id="detail-payment-badge">${statusBadge(paymentStatusLabel(o))}</span>`;
 
+    // Every order carries its own timestamps (all server-set, Asia/Manila).
+    const timesEl = document.getElementById("detail-times");
+    if (timesEl) {
+      const rows = [
+        ["Placed", o.created_at],
+        ["Paid", o.paid_at],
+        ["Payment failed", o.failed_at],
+        ["Cancelled", o.cancelled_at],
+        ["Last updated", o.updated_at],
+      ].filter(([, v]) => v);
+      timesEl.innerHTML = rows
+        .map(([k, v]) => `<span style="margin-right:18px"><strong>${k}:</strong> ${escapeHtml(fmtManila(v))}</span>`)
+        .join("");
+    }
+
     // Items — API returns `quantity` and `unit_price` from order_items
     document.getElementById("detail-items").innerHTML = (o.items || [])
       .map((item) => {
@@ -492,8 +504,8 @@ async function openOrderDetail(orderNumber) {
       <div class="order-item">
         <div class="order-item-img" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
         <div style="flex:1">
-          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${item.product_name}</div>
-          <div class="text-sm text-muted">${item.size || ""} × ${qty}</div>
+          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${escapeHtml(item.product_name)}</div>
+          <div class="text-sm text-muted">${escapeHtml(item.size || "")} × ${qty}</div>
         </div>
         <div style="font-weight:500">${formatPrice(price * qty)}</div>
       </div>`;
@@ -509,6 +521,17 @@ async function openOrderDetail(orderNumber) {
     if (elSub) elSub.textContent = formatPrice(subtotal);
     const elTotal = document.getElementById("detail-total-price");
     if (elTotal) elTotal.textContent = formatPrice(o.total_amount);
+
+    // Real shipping + VAT for this order (was a hardcoded "₱150.00").
+    {
+      const ship = Number(o.shipping_fee) || 0;
+      const disc = Number(o.discount) || 0;
+      const tax = Math.max(0, Number(o.total_amount) - subtotal + disc - ship);
+      const elShip = document.getElementById("detail-shipping");
+      if (elShip) elShip.textContent = ship === 0 ? "FREE" : formatPrice(ship);
+      const elTax = document.getElementById("detail-tax");
+      if (elTax) elTax.textContent = tax > 0.004 ? formatPrice(tax) : "—";
+    }
 
     // ── Update discount ──────────────────────────────────────────────
     const discountAmount = o.discount || 0;
@@ -526,10 +549,10 @@ async function openOrderDetail(orderNumber) {
     // Customer
     document.getElementById("detail-customer").innerHTML = `
       <div class="flex-center gap-12" style="margin-bottom:12px">
-        <div class="customer-avatar" style="width:38px;height:38px;font-size:16px">${initials(o.customer_name)}</div>
+        <div class="customer-avatar" style="width:38px;height:38px;font-size:16px">${escapeHtml(initials(o.customer_name))}</div>
         <div>
-          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${o.customer_name || "—"}</div>
-          <div class="text-sm text-muted">${o.customer_email || ""}</div>
+          <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${escapeHtml(o.customer_name) || "—"}</div>
+          <div class="text-sm text-muted">${escapeHtml(o.customer_email || "")}</div>
         </div>
       </div>`;
 
@@ -537,7 +560,7 @@ async function openOrderDetail(orderNumber) {
       .filter(Boolean)
       .join(", ");
     const elAddr = document.getElementById("detail-address");
-    if (elAddr) elAddr.innerHTML = addr || "—";
+    if (elAddr) elAddr.innerHTML = escapeHtml(addr) || "—";
 
     // Tracking number — HTML uses id="tracking-input"
     const elTrack = document.getElementById("tracking-input");
@@ -566,21 +589,6 @@ async function openOrderDetail(orderNumber) {
             )
             .join("")}
         </select>
-        <select class="filter-select" id="payment-status-select" style="height:36px;font-size:13px" title="Manually override payment status (use if PayMongo's webhook hasn't confirmed yet)">
-          ${[
-            ["unpaid", "Payment: Unpaid"],
-            ["processing", "Payment: Processing"],
-            ["paid", "Payment: Paid"],
-            ["failed", "Payment: Failed"],
-            ["refunded", "Payment: Refunded"],
-            ["cod", "Payment: COD"],
-          ]
-            .map(
-              ([val, label]) =>
-                `<option value="${val}" ${val === o.payment_status ? "selected" : ""}>${label}</option>`,
-            )
-            .join("")}
-        </select>
         <button class="btn btn-primary btn-sm" onclick="updateOrderStatus(${o.order_id})">Update Status</button>
         <button class="btn btn-outline btn-sm" onclick="showOrdersList()">← Back</button>`;
     }
@@ -598,9 +606,9 @@ async function openOrderDetail(orderNumber) {
           <div class="timeline-item">
             <div class="timeline-dot"></div>
             <div class="timeline-content">
-              <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${t.step_label}</div>
-              <div class="text-sm text-muted">${t.occurred_at ? new Date(t.occurred_at).toLocaleString("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : ""}</div>
-              ${t.note ? `<div class="text-sm text-muted" style="margin-top:2px">${t.note}</div>` : ""}
+              <div style="font-weight:500;font-size:15px;color:var(--brown-400)">${escapeHtml(t.step_label)}</div>
+              <div class="text-sm text-muted">${t.occurred_at ? escapeHtml(fmtManila(t.occurred_at)) : ""}</div>
+              ${t.note ? `<div class="text-sm text-muted" style="margin-top:2px">${escapeHtml(t.note)}</div>` : ""}
             </div>
           </div>`,
           )
@@ -614,7 +622,6 @@ async function openOrderDetail(orderNumber) {
 
 async function updateOrderStatus(orderId) {
   const status = document.getElementById("status-select")?.value;
-  const paymentStatus = document.getElementById("payment-status-select")?.value;
   const tracking = document.getElementById("tracking-input")?.value || "";
   if (!status) return;
 
@@ -634,7 +641,6 @@ async function updateOrderStatus(orderId) {
       body: JSON.stringify({
         order_id: orderId,
         status,
-        payment_status: paymentStatus,
         tracking_number: tracking,
       }),
     });
@@ -643,9 +649,6 @@ async function updateOrderStatus(orderId) {
       const el = document.getElementById("detail-status-badge");
       if (el)
         el.outerHTML = `<span id="detail-status-badge">${statusBadge(status)}</span>`;
-      const payEl = document.getElementById("detail-payment-badge");
-      if (payEl)
-        payEl.outerHTML = `<span id="detail-payment-badge">${statusBadge(paymentStatusLabel({ payment_status: paymentStatus }))}</span>`;
       showToast("Order updated successfully.", "ok");
     } else {
       showToast(data.error || "Update failed.", "error");
@@ -700,10 +703,10 @@ async function renderProductsTable() {
           <td>
             <div class="flex-center gap-12">
               <div class="product-thumb" style="display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--brown-100)"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></div>
-              <span style="font-weight:500;color:var(--brown-400)">${p.name}</span>
+              <span style="font-weight:500;color:var(--brown-400)">${escapeHtml(p.name)}</span>
             </div>
           </td>
-          <td class="text-muted">${p.category || "—"}</td>
+          <td class="text-muted">${escapeHtml(p.category) || "—"}</td>
           <td style="font-weight:500">${formatPrice(p.price)}</td>
           <td>
             <div class="stock-bar-wrap">
@@ -717,7 +720,7 @@ async function renderProductsTable() {
           <td>
             <div class="flex-center gap-8">
               <button class="btn btn-outline btn-sm" onclick="openProductEditor(${p.product_id})">Edit</button>
-              <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deleteProduct(${p.product_id},'${p.name.replace(/'/g, "\\'")}')">Delete</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red)" data-name="${escapeHtml(p.name)}" onclick="deleteProduct(${Number(p.product_id)}, this.dataset.name)">Delete</button>
             </div>
           </td>
         </tr>`;
@@ -977,7 +980,7 @@ async function deleteProduct(id, name) {
     const data = await res.json();
     if (data.success) {
       renderProductsTable();
-      showToast("Product deleted.", "ok");
+      showToast(data.archived ? data.message : "Product deleted.", "ok");
     } else showToast(data.error || "Delete failed.", "error");
   } catch (err) {
     console.error("[admin]", err);
@@ -1024,14 +1027,14 @@ async function renderCustomersTable() {
         <tr style="cursor:pointer" onclick="openCustomerProfile(${c.user_id})">
           <td>
             <div class="flex-center gap-12">
-              <div class="customer-avatar">${initials(c.full_name)}</div>
-              <span style="font-weight:500;color:var(--brown-400)">${c.full_name}</span>
+              <div class="customer-avatar">${escapeHtml(initials(c.full_name))}</div>
+              <span style="font-weight:500;color:var(--brown-400)">${escapeHtml(c.full_name)}</span>
             </div>
           </td>
-          <td class="text-muted">${c.email}</td>
+          <td class="text-muted">${escapeHtml(c.email)}</td>
           <td>${c.order_count}</td>
           <td style="font-weight:500">${formatPrice(c.total_spent)}</td>
-          <td class="text-muted">${new Date(c.created_at).toLocaleDateString("en-PH", { month: "short", year: "numeric" })}</td>
+          <td class="text-muted">${fmtManila(c.created_at, { month: "short", year: "numeric" })}</td>
           <td><button class="ellipsis-btn">···</button></td>
         </tr>`,
         )
@@ -1087,8 +1090,7 @@ async function openCustomerProfile(id) {
       
       const sinceEl = document.getElementById("profile-since");
 if (sinceEl && c.created_at) {
-  const date = new Date(c.created_at);
-  const formatted = date.toLocaleDateString("en-PH", { month: "short", year: "numeric" });
+  const formatted = fmtManila(c.created_at, { month: "short", year: "numeric" });
   sinceEl.textContent = formatted;
 }
 
@@ -1096,7 +1098,7 @@ if (sinceEl && c.created_at) {
     const addrDiv = document.getElementById("customer-shipping-address");
     if (addrDiv) {
       if (c.address && c.address.street) {
-        addrDiv.innerHTML = `${c.address.street}<br>${c.address.city}, ${c.address.province}<br>${c.address.zip_code}`;
+        addrDiv.innerHTML = `${escapeHtml(c.address.street)}<br>${escapeHtml(c.address.city)}, ${escapeHtml(c.address.province)}<br>${escapeHtml(c.address.zip_code)}`;
       } else {
         addrDiv.innerHTML = "No default address on file.";
       }
@@ -1111,7 +1113,7 @@ if (sinceEl && c.created_at) {
             (o) => `
           <tr>
             <td>#${o.order_number}</td>
-            <td class="text-muted">${new Date(o.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
+            <td class="text-muted">${fmtManila(o.created_at, MANILA_DATE_ONLY)}</td>
             <td>${statusBadge(o.status)}</td>
             <td style="font-weight:500">${formatPrice(o.total_amount)}</td>
           </table>
@@ -1180,7 +1182,7 @@ async function renderAnalytics() {
           (p, i) => `
         <div class="metric-row">
           <div>
-            <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${i + 1}. ${p.name}</div>
+            <div style="font-size:15px;font-weight:500;color:var(--brown-400)">${i + 1}. ${escapeHtml(p.name)}</div>
             <div class="text-sm text-muted">${p.quantity_sold} sold</div>
           </div>
           <div class="text-sm text-bold">${formatPrice(p.revenue)}</div>
@@ -1255,7 +1257,7 @@ async function renderPromotions() {
             : "—";
           return `
           <tr>
-            <td><span style="font-weight:600;letter-spacing:.05em;color:var(--brown-400)">${p.code}</span></td>
+            <td><span style="font-weight:600;letter-spacing:.05em;color:var(--brown-400)">${escapeHtml(p.code)}</span></td>
             <td class="text-muted">${p.discount_type === "percent" ? "Percentage" : "Fixed"}</td>
             <td style="font-weight:500">${discount}</td>
             <td class="text-muted text-sm">${minOrder}</td>
@@ -1265,7 +1267,7 @@ async function renderPromotions() {
             <td>
               <div class="flex-center gap-6">
                 <button class="btn btn-outline btn-sm" onclick="togglePromo(${p.promo_id}, ${p.is_active})">${p.is_active ? "Deactivate" : "Activate"}</button>
-                <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deletePromo(${p.promo_id},'${p.code}')">Delete</button>
+                <button class="btn btn-outline btn-sm" style="color:var(--red)" data-code="${escapeHtml(p.code)}" onclick="deletePromo(${Number(p.promo_id)}, this.dataset.code)">Delete</button>
               </div>
             </td>
           <tr>`;
@@ -1389,10 +1391,10 @@ async function renderInventory() {
               : "In Stock";
           return `
           <tr>
-            <td style="font-weight:500;color:var(--brown-400)">${item.product_name}</td>
-            <td class="text-muted">${item.size || "—"}</td>
-            <td><code style="font-size:13px;background:var(--beige-100);padding:2px 6px;border-radius:3px">${item.sku || "—"}</code></td>
-            <td class="text-muted">${item.category}</td>
+            <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(item.product_name)}</td>
+            <td class="text-muted">${escapeHtml(item.size) || "—"}</td>
+            <td><code style="font-size:13px;background:var(--beige-100);padding:2px 6px;border-radius:3px">${escapeHtml(item.sku) || "—"}</code></td>
+            <td class="text-muted">${escapeHtml(item.category)}</td>
             <td>
               <div class="flex-center gap-8">
                 <span style="font-weight:600;color:${isOut ? "var(--red)" : isLow ? "var(--gold)" : "var(--brown-400)"}">${qty}</span>
@@ -1475,16 +1477,16 @@ async function renderUsers() {
         <tr>
           <td>
             <div class="flex-center gap-12">
-              <div class="customer-avatar">${initials(u.full_name)}</div>
-              <span style="font-weight:500;color:var(--brown-400)">${u.full_name}</span>
+              <div class="customer-avatar">${escapeHtml(initials(u.full_name))}</div>
+              <span style="font-weight:500;color:var(--brown-400)">${escapeHtml(u.full_name)}</span>
             </div>
           </td>
-          <td class="text-muted">${u.email}</td>
-          <td><span class="role-badge ${roleClass[u.role] || "role-staff"}">${u.role}</span></td>
-          <td class="text-muted">${new Date(u.created_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
+          <td class="text-muted">${escapeHtml(u.email)}</td>
+          <td><span class="role-badge ${roleClass[u.role] || "role-staff"}">${escapeHtml(u.role)}</span></td>
+          <td class="text-muted">${fmtManila(u.created_at, MANILA_DATE_ONLY)}</td>
           <td>
             <div class="flex-center gap-8">
-              <button class="btn btn-outline btn-sm" onclick="deleteUser(${u.user_id},'${u.full_name.replace(/'/g, "\\'")}')">Remove</button>
+              <button class="btn btn-outline btn-sm" data-name="${escapeHtml(u.full_name)}" onclick="deleteUser(${Number(u.user_id)}, this.dataset.name)">Remove</button>
             </div>
           </td>
         </tr>`,
@@ -1601,7 +1603,7 @@ async function renderContactMessages() {
           <td>${escapeHtml(m.subject)}</td>
           <td class="text-muted text-sm" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(m.message)}</td>
           <td>${statusBadge(m.status)}</td>
-          <td class="text-muted">${new Date(m.sent_at).toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" })}</td>
+          <td class="text-muted">${fmtManila(m.sent_at, MANILA_DATE_ONLY)}</td>
           <td>
             <div class="flex-center gap-6">
               <button class="btn btn-outline btn-sm" onclick="viewContactMessage(${m.message_id})">View</button>
@@ -1660,9 +1662,9 @@ async function viewContactMessage(id) {
       "position:fixed;inset:0;background:rgba(28,17,9,.45);z-index:9000;display:flex;align-items:center;justify-content:center";
     overlay.innerHTML = `<div style="background:#fff;border-radius:4px;padding:28px 32px;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(28,17,9,.18)">
       <div style="font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--brown-100);margin-bottom:6px">Contact Message</div>
-      <div style="font-weight:500;color:var(--brown-400);font-size:17px;margin-bottom:4px">${m.subject}</div>
-      <div style="color:var(--brown-200);font-size:14px;margin-bottom:14px">${m.name} &lt;${m.email}&gt;</div>
-      <div style="font-size:15px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${m.message}</div>
+      <div style="font-weight:500;color:var(--brown-400);font-size:17px;margin-bottom:4px">${escapeHtml(m.subject)}</div>
+      <div style="color:var(--brown-200);font-size:14px;margin-bottom:14px">${escapeHtml(m.name)} &lt;${escapeHtml(m.email)}&gt;</div>
+      <div style="font-size:15px;color:var(--brown-300);line-height:1.7;white-space:pre-wrap;border-top:1px solid var(--beige-200);padding-top:12px">${escapeHtml(m.message)}</div>
       <div style="margin-top:20px;text-align:right">
         <button onclick="document.getElementById('_msg-overlay').remove()" style="background:var(--brown-400);color:#fff;border:none;border-radius:4px;padding:8px 18px;font-size:14px;cursor:pointer">Close</button>
       </div>
@@ -2068,7 +2070,7 @@ async function populateUserInfo() {
       if (el("sidebar-email")) el("sidebar-email").textContent = u.email;
       if (el("page-title") && currentPage === "dashboard") {
         el("page-title").innerHTML =
-          `Welcome back, <span>${u.full_name.split(" ")[0]}</span>`;
+          `Welcome back, <span>${escapeHtml(u.full_name.split(" ")[0])}</span>`;
       }
     }
   } catch (err) {
@@ -2236,8 +2238,8 @@ function renderVariants(sizes) {
             <option value="XXL" ${size.size === "XXL" ? "selected" : ""}>XXL</option>
           </select>
         </td>
-        <td><input type="number" class="form-input" data-variant-idx="${idx}" data-field="stock" value="${size.stock_qty || 0}" style="width:80px"></td>
-        <td><input type="text" class="form-input" data-variant-idx="${idx}" data-field="sku" value="${size.sku || ""}" placeholder="SKU"></td>
+        <td><input type="number" class="form-input" data-variant-idx="${idx}" data-field="stock" min="0" step="1" value="${Number(size.stock_qty) || 0}" style="width:80px"></td>
+        <td><input type="text" class="form-input" data-variant-idx="${idx}" data-field="sku" value="${escapeHtml(size.sku || "")}" placeholder="SKU"></td>
         <td><button class="btn btn-ghost btn-sm" onclick="removeVariant(${idx})">✕</button></td>
       </tr>
     `;
@@ -2260,7 +2262,7 @@ async function exportCustomers() {
       c.email,
       c.order_count,
       c.total_spent,
-      new Date(c.created_at).toLocaleDateString("en-PH"),
+      fmtManila(c.created_at, MANILA_DATE_ONLY),
       (c.admin_notes || "").replace(/,/g, ";") // escape commas
     ]);
 

@@ -18,6 +18,7 @@
 // ============================================================
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/stock.php';
 require_once __DIR__ . '/paymongo_client.php';
 require_once __DIR__ . '/order-confirmation-email.php';
 
@@ -36,13 +37,22 @@ debug_log('--- webhook invoked ---');
 
 header('Content-Type: application/json');
 
+if (PAYMONGO_WEBHOOK_SECRET === '') {
+    // Misconfiguration, not a bad caller: say so loudly (503 makes PayMongo
+    // retry later) instead of rejecting every genuine event as "bad signature".
+    error_log('PayMongo webhook: PAYMONGO_WEBHOOK_SECRET is not set — add it to .env (Dashboard > Developers > Webhooks > Signing secret).');
+    http_response_code(503);
+    echo json_encode(['error' => 'Webhook signing secret is not configured on the server.']);
+    exit;
+}
+
 $rawBody = file_get_contents('php://input');
 $signatureHeader = $_SERVER['HTTP_PAYMONGO_SIGNATURE'] ?? '';
 
 debug_log('Signature header present: ' . ($signatureHeader !== '' ? 'yes' : 'NO'));
 
 if (!paymongo_verify_webhook_signature($rawBody, $signatureHeader)) {
-    debug_log('SIGNATURE VERIFICATION FAILED. Header was: ' . $signatureHeader);
+    debug_log('SIGNATURE VERIFICATION FAILED.');
     error_log('PayMongo webhook: signature verification failed');
     http_response_code(401);
     echo json_encode(['error' => 'Invalid signature']);
@@ -141,12 +151,45 @@ try {
     if ($eventType === 'checkout_session.payment.paid') {
         debug_log('Event matched checkout_session.payment.paid — attempting to mark order as paid');
         if ($order['payment_status'] !== 'paid') {
+            stock_ensure_schema($pdo);
+            $pdo->beginTransaction();
+            $lockO = $pdo->prepare('SELECT status, payment_status FROM orders WHERE order_id = ? FOR UPDATE');
+            $lockO->execute([$order['order_id']]);
+            $fresh = $lockO->fetch(PDO::FETCH_ASSOC);
+
+            if ($fresh && $fresh['payment_status'] === 'paid') {
+                $pdo->rollBack(); // a concurrent delivery of the same event got here first
+                debug_log('Concurrent duplicate paid event, skipping');
+                http_response_code(200);
+                echo json_encode(['received' => true]);
+                exit;
+            }
+
+            $lateNote = null;
+            $newStatusSql = 'IF(status = "pending", "processing", status)';
+            if ($fresh && $fresh['status'] === 'cancelled') {
+                // The customer paid after we had already released this order's
+                // stock (hold expired / they cancelled, then paid on the old
+                // PayMongo page). Money has been taken, so try to take the
+                // units back; if they're gone, flag it for a manual refund.
+                if (stock_rereserve_order($pdo, (int) $order['order_id'])) {
+                    $newStatusSql = '"processing"';
+                    $lateNote = 'Payment received after the stock hold expired; stock re-reserved and order reopened.';
+                } else {
+                    $newStatusSql = '"cancelled"';
+                    $lateNote = 'REFUND REQUIRED: payment received after the stock hold expired and the items are no longer available.';
+                }
+            }
+
             $pdo->prepare('
                 UPDATE orders
                 SET payment_status = "paid", paid_at = NOW(),
-                    status = IF(status = "pending", "processing", status)
+                    cancelled_at = IF(' . $newStatusSql . ' = "cancelled", cancelled_at, NULL),
+                    status = ' . $newStatusSql . '
                 WHERE order_id = :oid
             ')->execute([':oid' => $order['order_id']]);
+            order_timeline_add($pdo, (int) $order['order_id'], 'Payment Received', $lateNote);
+            $pdo->commit();
             debug_log('UPDATE orders SET payment_status=paid executed for order_id=' . $order['order_id']);
 
             if ($txnId) {
@@ -198,8 +241,11 @@ try {
         // The session timed out without being paid — no separate "failed"
         // event exists for checkout sessions (see note at top of file).
         if (!in_array($order['payment_status'], ['paid'], true)) {
-            $pdo->prepare('UPDATE orders SET payment_status = "failed" WHERE order_id = :oid')
-                ->execute([':oid' => $order['order_id']]);
+            stock_ensure_schema($pdo);
+            // Marks the order failed + cancelled and puts its stock back on
+            // sale (idempotent: a re-delivered event restores nothing twice).
+            order_cancel_and_release($pdo, (int) $order['order_id'], 'failed', 'payment_expired',
+                'Payment session expired without payment.');
             if ($txnId) {
                 $pdo->prepare('UPDATE payment_transactions SET status = "failed" WHERE transaction_id = :tid')
                     ->execute([':tid' => $txnId]);

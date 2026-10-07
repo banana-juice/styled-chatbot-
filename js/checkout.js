@@ -133,14 +133,14 @@ async function renderCart() {
     totalQty += qty;
 
     const sizeLabel = item.size
-      ? `<span style="margin-left:6px;font-size:13px;color:var(--text-muted);">Size: ${item.size}</span>`
+      ? `<span style="margin-left:6px;font-size:13px;color:var(--text-muted);">Size: ${escapeHtml(item.size)}</span>`
       : "";
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td><div class="item-cell"><div class="item-thumb-placeholder"><img class="item-thumb" src="${item.img}" alt="${item.name}" onerror="this.style.display='none'" style="width:56px;height:64px;object-fit:cover;" /></div><div><p class="item-name">${item.name}</p><p class="item-meta">${item.category || ""}${sizeLabel}</p></div></div></td>
-      <td><div class="qty-control"><button class="qty-btn" data-idx="${idx}" data-delta="-1">−</button><span class="qty-num">${qty}</span><button class="qty-btn" data-idx="${idx}" data-delta="1">+</button></div></td>
-      <td>${formatPrice(unitPrice)}</td>
-      <td>${formatPrice(lineTotal)}</td>
+      <td><div class="item-cell"><div class="item-thumb-placeholder"><img class="item-thumb" src="${escapeHtml(item.img)}" alt="${escapeHtml(item.name)}" onerror="this.style.display='none'" style="width:56px;height:64px;object-fit:cover;" /></div><div><p class="item-name">${escapeHtml(item.name)}</p><p class="item-meta">${escapeHtml(item.category || "")}${sizeLabel}</p></div></div></td>
+      <td data-label="Qty"><div class="qty-control"><button class="qty-btn" data-idx="${idx}" data-delta="-1">−</button><span class="qty-num">${qty}</span><button class="qty-btn" data-idx="${idx}" data-delta="1">+</button></div></td>
+      <td data-label="Price">${formatPrice(unitPrice)}</td>
+      <td data-label="Total">${formatPrice(lineTotal)}</td>
       <td><button class="remove-btn" data-idx="${idx}">Remove</button></td>
     `;
     tbody.appendChild(tr);
@@ -157,7 +157,7 @@ async function renderCart() {
       const idx = parseInt(btn.dataset.idx);
       const delta = parseInt(btn.dataset.delta);
       const cart = await getCart();
-      cart[idx].qty = Math.max(1, (cart[idx].qty || 1) + delta);
+      cart[idx].qty = Math.min(99, Math.max(1, (cart[idx].qty || 1) + delta));
       await saveCart(cart);
       renderCart();
     });
@@ -303,7 +303,19 @@ async function applyPromo() {
   }
 }
 
+let placingOrder = false; // blocks a second click before the first request returns
+
 async function placeOrder() {
+  if (placingOrder) return;
+  placingOrder = true;
+  try {
+    await placeOrderInner();
+  } finally {
+    placingOrder = false;
+  }
+}
+
+async function placeOrderInner() {
   const cart = await getCart();
   if (cart.length === 0) {
     alert("Your cart is empty!");
@@ -346,11 +358,12 @@ async function placeOrder() {
     return;
   }
 
+  // Prices are deliberately NOT sent: the server prices every line from the
+  // catalog, so what the customer is charged can't be edited in the browser.
   const items = cart.map((item) => ({
     product_id: item.product_id,
     size: item.size || "",
     qty: item.qty || 1,
-    unit_price: parsePrice(item.price),
   }));
 
   const shipping_address = {
@@ -365,6 +378,7 @@ async function placeOrder() {
     btn.disabled = true;
     btn.textContent = "Placing order…";
   }
+  document.querySelector(".btn-place-order")?.classList.add("disabled");
 
   try {
     const res = await fetch(`${API_BASE}/php/checkout.php`, {
@@ -432,6 +446,7 @@ async function placeOrder() {
       btn.disabled = false;
       btn.textContent = "Place Order";
     }
+    document.querySelector(".btn-place-order")?.classList.remove("disabled");
   }
 }
 
@@ -466,18 +481,28 @@ document.querySelector(".success-overlay")?.addEventListener("click", (e) => {
 
 initCheckout();
 
-// If the customer cancelled/backed out of PayMongo's hosted checkout,
-// they land back here with ?payment=cancelled — the order still exists
-// (as "unpaid"), so let them know they can retry from Order History
-// rather than silently losing track of it.
+// If the customer cancelled/backed out of PayMongo's hosted checkout, they
+// land back here with ?payment=cancelled. Cancel the order server-side so the
+// units it was holding go straight back on sale (instead of staying locked
+// away from other customers). They can still reopen and pay it from Order
+// History while those items remain in stock.
 const checkoutParams = new URLSearchParams(window.location.search);
 if (checkoutParams.get("payment") === "cancelled") {
   const orderNum = checkoutParams.get("order");
+  if (orderNum) {
+    fetch(`${API_BASE}/php/cancel_payment.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ order_number: orderNum }),
+    }).catch(() => {});
+  }
   showToast?.(
     orderNum
-      ? `Payment for order #${orderNum} was cancelled. You can retry payment from Order History.`
+      ? `Payment for order #${orderNum} was cancelled. You can retry it from Order History.`
       : "Payment was cancelled.",
     "error",
   );
+  // Clean the URL so a refresh doesn't repeat the cancel / toast.
+  window.history.replaceState({}, "", window.location.pathname);
 }
-

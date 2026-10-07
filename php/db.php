@@ -3,6 +3,15 @@
 require_once __DIR__ . '/config/env.php';
 loadEnv();
 
+// One explicit timezone for the whole app. Without this, PHP's date() and
+// MySQL's NOW() each fall back to whatever the host happens to default to,
+// so the same order could show different times on different pages (or
+// shift entirely after a hosting move). Asia/Manila (+08:00, no DST) is the
+// store's local time.
+define('APP_TIMEZONE', 'Asia/Manila');
+define('APP_TZ_OFFSET', '+08:00');
+date_default_timezone_set(APP_TIMEZONE);
+
 // DB_* come from the environment (.env) so the same code works locally and
 // in production without ever hardcoding a real credential in a committed
 // file — same pattern as ANTHROPIC_API_KEY in php/chatbot.php. Falls back
@@ -36,6 +45,8 @@ function getPDO(): PDO {
 
     try {
         $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
+        // Keep NOW()/CURRENT_TIMESTAMP in step with date_default_timezone_set().
+        $pdo->exec("SET time_zone = '" . APP_TZ_OFFSET . "'");
     } catch (PDOException $e) {
         // Never expose the real error message to the client in production.
         error_log('Database connection failed: ' . $e->getMessage());

@@ -1006,8 +1006,13 @@
   <option value="paid">Paid</option>
   <option value="unpaid">Unpaid</option>
   <option value="failed">Failed</option>
+  <option value="cancelled">Cancelled</option>
   <option value="refunded">Refunded</option>
 </select>
+                <select class="filter-select" id="orders-sort" onchange="sortOrders(this.value)" title="Order the list by date placed">
+                  <option value="asc" selected>Oldest first (FIFO)</option>
+                  <option value="desc">Newest first</option>
+                </select>
                 <input type="date" class="filter-select" style="width: auto" />
                 <input type="date" class="filter-select" style="width: auto" />
               </div>
@@ -1054,6 +1059,7 @@
                   align-items: center;
                   gap: 12px;
                   margin-bottom: 20px;
+                  flex-wrap: wrap;
                 "
               >
                 <div
@@ -1065,6 +1071,7 @@
                 </div>
                 <span id="detail-status-badge" class="badge"></span>
                 <span id="detail-payment-badge" class="badge"></span>
+                <div id="detail-times" class="text-sm text-muted" style="flex-basis: 100%; line-height: 1.7"></div>
                 <div style="margin-left: auto; display: flex; gap: 8px">
                   <button class="btn btn-outline btn-sm">Print Invoice</button>
                   <button class="btn btn-outline btn-sm">Resend Email</button>
@@ -1097,7 +1104,11 @@
                       </div>
                       <div class="metric-row">
                         <span class="text-muted">Shipping</span
-                        ><span>₱150.00</span>
+                        ><span id="detail-shipping">—</span>
+                      </div>
+                      <div class="metric-row" id="detail-tax-row">
+                        <span class="text-muted">VAT</span
+                        ><span id="detail-tax">—</span>
                       </div>
                       <div
                         class="metric-row"
@@ -2512,6 +2523,7 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
     <!-- /app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/admin.js?v=20260923"></script>
+    <script src="js/safe.js?v=20261007b"></script>
+    <script src="js/admin.js?v=20261007b"></script>
   </body>
 </html>

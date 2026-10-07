@@ -39,6 +39,7 @@ $password = $input['password'] ?? '';
 // Validation
 $errors = [];
 if (empty($full_name)) $errors[] = 'Full name required.';
+if (mb_strlen($full_name) > 100) $errors[] = 'Full name must be 100 characters or fewer.';
 if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = 'Valid email required.';
 if (strlen($password) < 8) $errors[] = 'Password must be at least 8 characters.';
 
@@ -70,6 +71,7 @@ if (!$insert->execute([$full_name, $email, $hashed])) {
 $user_id = $pdo->lastInsertId();
 
 // Generate code
+$safeName = htmlspecialchars($full_name, ENT_QUOTES, 'UTF-8');
 $code = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
 $pdo->prepare('DELETE FROM email_verifications WHERE user_id = ?')->execute([$user_id]);
 $pdo->prepare('INSERT INTO email_verifications (user_id, code, expires_at) VALUES (?, ?, NOW() + INTERVAL 15 MINUTE)')->execute([$user_id, $code]);
@@ -79,7 +81,7 @@ $subject = 'Your Styled verification code';
 $htmlBody = "
 <div style='font-family:sans-serif;max-width:480px;margin:auto;padding:32px;'>
     <h2 style='color:#2c1f14;margin-bottom:8px;font-family:Georgia,serif;font-weight:400;'>Verify your email</h2>
-    <p style='color:#8a7f74;font-size:14px;line-height:1.7;'>Hi {$full_name}, thanks for signing up to Styled. Use this code to verify your email address:</p>
+    <p style='color:#8a7f74;font-size:14px;line-height:1.7;'>Hi {$safeName}, thanks for signing up to Styled. Use this code to verify your email address:</p>
     <div style='font-size:40px;font-weight:400;letter-spacing:14px;text-align:center;padding:28px;background:#f5f0e8;margin:28px 0;color:#2c1f14;font-family:Georgia,serif;'>{$code}</div>
     <p style='color:#8a7f74;font-size:12px;'>This code expires in <strong style='color:#2c1f14;'>15 minutes</strong>. If you didn't create an account, you can safely ignore this email.</p>
 </div>";

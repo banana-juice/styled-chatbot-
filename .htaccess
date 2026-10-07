@@ -13,3 +13,21 @@
 
 # Block the .git directory outright (exposes full repo history if reachable)
 RedirectMatch 404 /\.git(/|$)
+
+
+# Block debug logs, SQL dumps and internal docs. php/paymongo_webhook_debug.log
+# is written by the webhook and would otherwise be readable by anyone who
+# guesses its URL.
+<FilesMatch "\.(log|sql|md|env|example)$">
+    Require all denied
+</FilesMatch>
+
+# HTML pages must always be revalidated. With no Cache-Control a browser may
+# reuse a page for hours, and that stale page then loads OLD ?v= script and
+# stylesheet URLs -- so a deploy appeared to "not take" for returning visitors.
+# (no-cache = "check with the server first", answered with a cheap 304.)
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache"
+    </FilesMatch>
+</IfModule>

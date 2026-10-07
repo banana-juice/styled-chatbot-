@@ -16,8 +16,11 @@ session_start();
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/stock.php';
 
 $pdo = getPDO();
+stock_ensure_schema($pdo);
+stock_release_stale_holds($pdo);
 $method = $_SERVER['REQUEST_METHOD'];
 
 // Auth check
@@ -38,6 +41,16 @@ function formatPrice($num) {
     return '₱' . number_format((float)$num, 2);
 }
 
+// Timestamps are written by the server in Asia/Manila (see db.php). Send
+// both a human string with the time of day and an ISO-8601 string with the
+// explicit +08:00 offset, so the browser never has to guess a timezone.
+function fmtDateTime($ts) {
+    return $ts ? date('M d, Y g:i A', strtotime($ts)) : null;
+}
+function isoDateTime($ts) {
+    return $ts ? date('c', strtotime($ts)) : null;
+}
+
 // Single order
 if (!empty($_GET['id'])) {
     $order_number = trim($_GET['id']);
@@ -45,6 +58,8 @@ if (!empty($_GET['id'])) {
         SELECT o.order_id, o.order_number, o.status, o.payment_method,
                o.payment_status,
                o.grand_total AS total, o.created_at, o.tracking_number,
+               o.paid_at, o.failed_at, o.cancelled_at, o.updated_at,
+               o.shipping_fee, o.discount,
                a.street, a.city, a.province, a.zip_code
         FROM orders o
         LEFT JOIN addresses a ON a.address_id = o.address_id
@@ -96,11 +111,16 @@ if (!empty($_GET['id'])) {
         'paid'       => 'Paid',
         'failed'     => 'Payment Failed',
         'refunded'   => 'Refunded',
+        'cancelled'  => 'Payment Cancelled',
         'cod'        => 'Pay on Delivery',
     ];
     $paymentStatusDisplay = $paymentStatusMap[$order['payment_status']] ?? ucfirst($order['payment_status']);
 
-    $shippingFee = max(0, $order['total'] - $subtotal);
+    // Real figures from the order itself. This used to be total - subtotal,
+    // which folded VAT (and any discount) into the "Shipping" line.
+    $shippingFee = (float) $order['shipping_fee'];
+    $discount    = (float) $order['discount'];
+    $tax         = max(0, round((float) $order['total'] - $subtotal + $discount - $shippingFee, 2));
     $address = implode(', ', array_filter([$order['street'], $order['city'], $order['province'], $order['zip_code']]));
 
     // Timeline
@@ -117,15 +137,31 @@ if (!empty($_GET['id'])) {
         $steps[] = [
             'label' => $t['step_label'],
             'date' => date('M d, Y', strtotime($t['occurred_at'])),
+            'datetime' => fmtDateTime($t['occurred_at']),
+            'datetime_iso' => isoDateTime($t['occurred_at']),
             'done' => true,
             'active' => false,
         ];
     }
 
+    $canRetry = $order['payment_method'] !== 'cod'
+        && in_array($order['payment_status'], ['unpaid', 'processing', 'failed', 'cancelled'], true)
+        && ($order['status'] !== 'cancelled' || order_can_reopen_for_payment($pdo, (int) $order['order_id']));
+
     $orderData = [
         'order_id' => $order['order_id'],
+        'can_retry_payment' => $canRetry,
         'id' => $order['order_number'],
         'date' => date('M d, Y', strtotime($order['created_at'])),
+        'date_time' => fmtDateTime($order['created_at']),
+        'created_at_iso' => isoDateTime($order['created_at']),
+        'paid_at' => fmtDateTime($order['paid_at']),
+        'paid_at_iso' => isoDateTime($order['paid_at']),
+        'failed_at' => fmtDateTime($order['failed_at']),
+        'failed_at_iso' => isoDateTime($order['failed_at']),
+        'cancelled_at' => fmtDateTime($order['cancelled_at']),
+        'cancelled_at_iso' => isoDateTime($order['cancelled_at']),
+        'updated_at' => fmtDateTime($order['updated_at']),
         'total' => formatPrice($order['total']),
         'totalNum' => (float) $order['total'],
         'status' => ucfirst($order['status']),
@@ -138,6 +174,8 @@ if (!empty($_GET['id'])) {
             'cost' => $shippingFee,
             'cost_display' => $shippingFee == 0 ? 'FREE' : formatPrice($shippingFee)
         ],
+        'discount_display' => $discount > 0 ? '−' . formatPrice($discount) : null,
+        'tax_display' => $tax > 0 ? formatPrice($tax) : null,
         'subtotal' => formatPrice($subtotal),
         'subtotalNum' => $subtotal,
         'tracking' => [
@@ -153,7 +191,8 @@ if (!empty($_GET['id'])) {
 
 // List orders
 $stmt = $pdo->prepare("
-    SELECT order_id, order_number, status, payment_method, payment_status, grand_total AS total, created_at
+    SELECT order_id, order_number, status, payment_method, payment_status, grand_total AS total, created_at,
+           paid_at, failed_at, cancelled_at
     FROM orders
     WHERE user_id = ?
     ORDER BY created_at DESC
@@ -182,6 +221,11 @@ foreach ($rows as $row) {
         'order_id' => $row['order_id'],
         'id' => $row['order_number'],
         'date' => date('M d, Y', strtotime($row['created_at'])),
+        'date_time' => fmtDateTime($row['created_at']),
+        'created_at_iso' => isoDateTime($row['created_at']),
+        'paid_at' => fmtDateTime($row['paid_at']),
+        'cancelled_at' => fmtDateTime($row['cancelled_at']),
+        'failed_at' => fmtDateTime($row['failed_at']),
         'total' => formatPrice($row['total']),
         'status' => ucfirst($row['status']),
         'payment_method' => $row['payment_method'],

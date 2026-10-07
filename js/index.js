@@ -79,7 +79,7 @@ function showProductsError(message) {
         <line x1="12" y1="8" x2="12" y2="12"/>
         <line x1="12" y1="16" x2="12.01" y2="16"/>
       </svg>
-      <br>${message || "Failed to load products."}
+      <br>${escapeHtml(message || "Failed to load products.")}
       <br><button onclick="renderProducts(currentCategory)"
             style="margin-top:14px;padding:6px 18px;border:1px solid currentColor;
                    background:none;cursor:pointer;font-size:14px;letter-spacing:1px;">
@@ -174,21 +174,30 @@ async function renderProducts(cat) {
       ) {
         formattedPrice = `₱${parseFloat(formattedPrice).toFixed(2)}`;
       }
+      // The feed reports total units in stock. Fallback (static) data has no
+      // stock field at all — treat "unknown" as available, "0" as sold out.
+      const soldOut = p.stock !== undefined && p.stock !== null && Number(p.stock) <= 0;
+      const safeName = escapeHtml(p.name);
+      const cartData = escapeHtml(JSON.stringify({ ...p, price: formattedPrice }));
+      const wishData = escapeHtml(
+        JSON.stringify({ name: p.name, price: formattedPrice, img: imgSrc, description: p.description }),
+      );
       return `
-       <div class="product-card" data-product-id="${p.product_id}" data-product-name="${p.name.replace(/"/g, "&quot;")}" data-category="${cat}">
+       <div class="product-card${soldOut ? " sold-out" : ""}" data-product-id="${Number(p.product_id)}" data-product-name="${safeName}" data-category="${escapeHtml(cat)}" data-sold-out="${soldOut ? "1" : "0"}">
           <div class="product-img-wrap">
-            <button class="wish-btn ${isInWishlist(p.name) ? "active" : ""}" 
-                    data-product-name="${p.name.replace(/"/g, "&quot;")}" 
-                    data-product='${JSON.stringify({ name: p.name, price: formattedPrice, img: imgSrc, description: p.description }).replace(/'/g, "&#39;")}'>
+            ${soldOut ? '<span class="sold-out-badge">Sold out</span>' : ""}
+            <button class="wish-btn ${isInWishlist(p.name) ? "active" : ""}"
+                    data-product-name="${safeName}"
+                    data-product='${wishData}'>
               <svg class="wish-icon" viewBox="0 0 24 24"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.6z" fill="currentColor"/></svg>
             </button>
-            <img src="${imgSrc}" alt="${p.name}" loading="lazy" onerror="this.src='/styled/assets/images/placeholder.jpg'" />
+            <img src="${escapeHtml(imgSrc)}" alt="${safeName}" loading="lazy" onerror="this.src='/styled/assets/images/placeholder.jpg'" />
           </div>
-          <p class="product-name">${p.name}</p>
-          <p class="product-price">${formattedPrice}</p>
-          <button class="btn-cart" data-product-id="${p.product_id}" data-product-category="${cat}" data-product='${JSON.stringify({ ...p, price: formattedPrice }).replace(/'/g, "&#39;")}'>
+          <p class="product-name">${safeName}</p>
+          <p class="product-price">${escapeHtml(formattedPrice)}</p>
+          <button class="btn-cart" ${soldOut ? "disabled aria-disabled=\"true\"" : ""} data-product-id="${Number(p.product_id)}" data-product-category="${escapeHtml(cat)}" data-product='${cartData}'>
             <svg class="cart-btn-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" fill="currentColor"/><line x1="3" y1="6" x2="21" y2="6" stroke="white" stroke-width="1.5"/><path d="M16 10a4 4 0 0 1-8 0" fill="none" stroke="white" stroke-width="1.5"/></svg>
-            Add to Cart
+            ${soldOut ? "Sold Out" : "Add to Cart"}
           </button>
         </div>
       `;
@@ -199,7 +208,7 @@ async function renderProducts(cat) {
   const wishlistHandler = (e) => {
     e.stopPropagation();
     const btn = e.currentTarget;
-    const productData = JSON.parse(btn.dataset.product.replace(/&#39;/g, "'"));
+    const productData = JSON.parse(btn.dataset.product);
     toggleWishlistItem(productData);
     btn.classList.toggle("active", isInWishlist(productData.name));
   };
@@ -239,6 +248,8 @@ async function renderProducts(cat) {
               prod.primary_image ||
               "",
             description: prod.description,
+            sizes: prod.sizes,
+            in_stock: Array.isArray(prod.sizes) ? prod.sizes.length > 0 : undefined,
           };
           openProductModal(modalProduct, data.product.category_slug);
         } else {
@@ -255,6 +266,7 @@ async function renderProducts(cat) {
   const cartButtonHandler = async (e) => {
     e.stopPropagation();
     const btn = e.currentTarget;
+    if (btn.disabled) return;
     const productId = btn.dataset.productId;
     const category = btn.dataset.productCategory;
     const user = getCurrentUser();
@@ -290,6 +302,8 @@ async function renderProducts(cat) {
               prod.primary_image ||
               "",
             description: prod.description,
+            sizes: prod.sizes,
+            in_stock: Array.isArray(prod.sizes) ? prod.sizes.length > 0 : undefined,
           };
           openProductModal(modalProduct, category);
         } else {
@@ -303,6 +317,7 @@ async function renderProducts(cat) {
       // Accessories: add directly to cart (no size needed)
       await saveCart({ product_id: productId, size: "", qty: 1 });
       await getCart();
+      if (!_lastCartOk) return; // server refused (e.g. just sold out); toast already shown
       showToast("Added to cart!");
       btn.innerHTML = `<svg style="width:14px;height:14px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>Added!`;
       btn.style.background = "#3a6b4a";
@@ -322,7 +337,7 @@ async function renderProducts(cat) {
 function wishlistClickHandler(e) {
   e.stopPropagation();
   const btn = e.currentTarget;
-  const productData = JSON.parse(btn.dataset.product.replace(/&#39;/g, "'"));
+  const productData = JSON.parse(btn.dataset.product);
   toggleWishlistItem(productData);
   // Update button active state immediately (optimistic)
   btn.classList.toggle("active", isInWishlist(productData.name));

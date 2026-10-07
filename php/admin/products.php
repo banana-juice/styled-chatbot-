@@ -13,10 +13,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../stock.php';
 
 $user   = requireAuth();
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getPDO();
+stock_ensure_schema($pdo);
+
+/** Shared product-field validation. Returns an error string or null. */
+function validate_product_fields(?string $name, $price): ?string {
+    if ($name !== null) {
+        if ($name === '') return 'Product name is required.';
+        if (mb_strlen($name) > 200) return 'Product name must be 200 characters or fewer.';
+    }
+    if ($price !== null) {
+        if (!is_numeric($price)) return 'Price must be a number.';
+        if ((float) $price <= 0) return 'Price must be greater than zero.';
+        if ((float) $price > 10000000) return 'Price is too large.';
+    }
+    return null;
+}
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 if ($method === 'GET') {
@@ -154,6 +170,17 @@ if ($method === 'POST') {
         echo json_encode(['success' => false, 'error' => 'name, category_id and price are required.']);
         exit;
     }
+    // `!$price` only rejects exactly 0 -- a negative price (-99) sailed through.
+    if ($err = validate_product_fields($name, $price)) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => $err]);
+        exit;
+    }
+    if (mb_strlen($description) > 5000) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Description must be 5000 characters or fewer.']);
+        exit;
+    }
 
     // Insert product
     $stmt = $pdo->prepare("
@@ -227,12 +254,47 @@ if ($method === 'PUT') {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
         $imagesActions = $body['images'] ?? [];
         
+        // Validate everything first so a bad value can't leave the product
+        // half-updated (e.g. name saved, variants rejected).
+        $nameIn  = isset($body['name']) ? trim((string) $body['name']) : null;
+        $priceIn = isset($body['price']) ? $body['price'] : null;
+        if ($err = validate_product_fields($nameIn, $priceIn)) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => $err]);
+            exit;
+        }
+        if (isset($body['description']) && mb_strlen((string) $body['description']) > 5000) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'Description must be 5000 characters or fewer.']);
+            exit;
+        }
+        $validSizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+        $cleanVariants = null;
+        if (isset($body['variants']) && is_array($body['variants'])) {
+            $cleanVariants = [];
+            foreach ($body['variants'] as $v) {
+                if (empty($v['size'])) continue;
+                $qtyRaw = $v['stock_qty'] ?? 0;
+                if (!in_array($v['size'], $validSizes, true)
+                    || !is_numeric($qtyRaw) || (int) $qtyRaw != $qtyRaw
+                    || (int) $qtyRaw < 0 || (int) $qtyRaw > 1000000) {
+                    http_response_code(400);
+                    echo json_encode(['success' => false, 'error' => 'Each variant needs a valid size and a whole-number stock of 0 or more.']);
+                    exit;
+                }
+                $cleanVariants[$v['size']] = [
+                    'qty' => (int) $qtyRaw,
+                    'sku' => isset($v['sku']) ? mb_substr(trim((string) $v['sku']), 0, 100) : null,
+                ];
+            }
+        }
+
         // Update product fields from JSON
         $fields = [];
         $params = [];
-        if (isset($body['name'])) {
+        if ($nameIn !== null) {
             $fields[] = 'name = ?';
-            $params[] = $body['name'];
+            $params[] = $nameIn;
         }
         if (isset($body['description'])) {
             $fields[] = 'description = ?';
@@ -250,21 +312,34 @@ if ($method === 'PUT') {
             $params[] = $id;
             $pdo->prepare("UPDATE products SET " . implode(', ', $fields) . " WHERE product_id = ?")->execute($params);
         }
-        
-        // ── Update variants (sizes) ─────────────────────────────────────────
-        if (isset($body['variants']) && is_array($body['variants'])) {
-            // Delete existing sizes for this product
+
+        // -- Update variants (sizes) ------------------------------------------
+        // Replace-all, in one transaction, and every size whose stock changed
+        // is written to the stock audit log with who changed it and when.
+        if ($cleanVariants !== null) {
+            $pdo->beginTransaction();
+            $old = $pdo->prepare('SELECT size, stock_qty FROM product_sizes WHERE product_id = ? FOR UPDATE');
+            $old->execute([$id]);
+            $oldQty = $old->fetchAll(PDO::FETCH_KEY_PAIR);
+
             $pdo->prepare("DELETE FROM product_sizes WHERE product_id = ?")->execute([$id]);
-            // Insert new ones
             $insert = $pdo->prepare("INSERT INTO product_sizes (product_id, size, stock_qty, sku) VALUES (?, ?, ?, ?)");
-            foreach ($body['variants'] as $v) {
-                if (!empty($v['size'])) {
-                    $insert->execute([$id, $v['size'], (int)($v['stock_qty'] ?? 0), $v['sku'] ?? null]);
+            foreach ($cleanVariants as $size => $v) {
+                $insert->execute([$id, $size, $v['qty'], $v['sku']]);
+                $before = array_key_exists($size, $oldQty) ? (int) $oldQty[$size] : 0;
+                if ($before !== $v['qty']) {
+                    stock_log($pdo, $id, $size, $v['qty'] - $before, $before, $v['qty'], 'admin_adjust', null, $user['user_id'], 'Product variants edited');
                 }
             }
+            foreach ($oldQty as $size => $qty) {
+                if (!isset($cleanVariants[$size]) && (int) $qty !== 0) {
+                    stock_log($pdo, $id, $size, -(int) $qty, (int) $qty, 0, 'admin_adjust', null, $user['user_id'], 'Size removed');
+                }
+            }
+            $pdo->commit();
         }
     }
-    
+
     // Process image actions (both JSON and multipart)
     foreach ($imagesActions as $action) {
         $actionType = $action['action'] ?? '';
@@ -338,8 +413,28 @@ if ($method === 'DELETE') {
         exit;
     }
 
-    // Delete (images will cascade due to foreign key constraint)
+    // A product that has ever been ordered can't be hard-deleted: order_items
+    // references it (the old code just crashed with a foreign-key error), and
+    // past orders must keep showing what was bought. Archive it instead — the
+    // storefront only lists status = 'active', so it disappears from sale.
+    $ordered = $pdo->prepare("SELECT COUNT(*) FROM order_items WHERE product_id = ?");
+    $ordered->execute([$id]);
+    if ((int) $ordered->fetchColumn() > 0) {
+        $pdo->prepare("UPDATE products SET status = 'archived' WHERE product_id = ?")->execute([$id]);
+        echo json_encode(['success' => true, 'archived' => true,
+            'message' => 'This product appears in past orders, so it was archived (removed from sale) instead of deleted.']);
+        exit;
+    }
+
+    // product_sizes and product_images have no foreign key to products, so
+    // nothing cascades: delete the children explicitly, in one transaction,
+    // or their rows are orphaned (and stock rows linger for a product that no
+    // longer exists).
+    $pdo->beginTransaction();
+    $pdo->prepare("DELETE FROM product_sizes WHERE product_id = ?")->execute([$id]);
+    $pdo->prepare("DELETE FROM product_images WHERE product_id = ?")->execute([$id]);
     $pdo->prepare("DELETE FROM products WHERE product_id = ?")->execute([$id]);
+    $pdo->commit();
 
     echo json_encode(['success' => true]);
     exit;

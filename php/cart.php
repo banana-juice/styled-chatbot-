@@ -107,19 +107,71 @@ try {
     if ($method === 'POST') {
         $body       = get_json_body();
         $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
-        $qty        = isset($body['qty'])        ? (int) $body['qty']         : 1;
-
-        // Validate size against the ENUM — default to 'XS' for accessories
-        $valid_sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
-        $size = isset($body['size']) && in_array($body['size'], $valid_sizes)
-                ? trim($body['size']) : 'XS';
+        $qtyRaw     = array_key_exists('qty', $body) ? $body['qty'] : 1;
 
         if ($product_id <= 0) {
             http_response_code(400);
             echo json_encode(['error' => 'product_id is required']);
             exit;
         }
-        if ($qty < 1) { $qty = 1; }
+
+        // Quantity must be a real whole number from 1 to 99. Before, 0,
+        // negatives and text were silently turned into 1 and 999999 was
+        // stored as-is, so the cart could disagree with what the customer typed.
+        if ((!is_int($qtyRaw) && !(is_string($qtyRaw) && ctype_digit($qtyRaw)))
+            || (int) $qtyRaw < 1 || (int) $qtyRaw > 99) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Quantity must be a whole number between 1 and 99.']);
+            exit;
+        }
+        $qty = (int) $qtyRaw;
+
+        // Only active products with stock rows can be carted.
+        $prod = $pdo->prepare("SELECT name FROM products WHERE product_id = :pid AND status = 'active' AND is_active = 1");
+        $prod->execute([':pid' => $product_id]);
+        $productName = $prod->fetchColumn();
+        if ($productName === false) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Product not found.']);
+            exit;
+        }
+
+        // Resolve the size against the sizes this product really has. An
+        // unknown size is an error now, instead of silently becoming 'XS'
+        // (which put the wrong variant in the cart).
+        $valid_sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+        $szStmt = $pdo->prepare('SELECT size, stock_qty FROM product_sizes WHERE product_id = :pid');
+        $szStmt->execute([':pid' => $product_id]);
+        $stockBySize = $szStmt->fetchAll(PDO::FETCH_KEY_PAIR);
+
+        $size = strtoupper(trim((string) ($body['size'] ?? '')));
+        if ($size === '' && count($stockBySize) === 1) {
+            $size = (string) array_key_first($stockBySize); // single-variant item
+        }
+        if ($size === '') {
+            http_response_code(400);
+            echo json_encode(['error' => 'Please choose a size.', 'code' => 'size_required']);
+            exit;
+        }
+        if (!in_array($size, $valid_sizes, true) || !array_key_exists($size, $stockBySize)) {
+            http_response_code(400);
+            echo json_encode(['error' => "{$productName} isn't available in size {$size}.", 'code' => 'size_unavailable']);
+            exit;
+        }
+
+        // Never carry more than is in stock. Checkout re-checks authoritatively;
+        // this just stops the cart promising units that don't exist.
+        $available = (int) $stockBySize[$size];
+        $notice = null;
+        if ($available < 1) {
+            http_response_code(409);
+            echo json_encode(['error' => "{$productName} (size {$size}) is out of stock.", 'code' => 'out_of_stock']);
+            exit;
+        }
+        if ($qty > $available) {
+            $qty = $available;
+            $notice = "Only {$available} of {$productName} (size {$size}) available; quantity adjusted.";
+        }
 
         // Manual upsert: check if row exists, then UPDATE or INSERT
         // (ON DUPLICATE KEY needs a unique key on (user_id, product_id, size)
@@ -150,7 +202,11 @@ try {
             ]);
         }
 
-        echo json_encode(cart_response($pdo, $user_id));
+        $response = cart_response($pdo, $user_id);
+        if ($notice !== null) {
+            $response['notice'] = $notice;
+        }
+        echo json_encode($response);
         exit;
     }
 

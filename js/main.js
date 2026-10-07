@@ -512,6 +512,14 @@ function getCartSync() {
  * @returns {Promise<Array>}
  */
 async function getCart() {
+  // Guests have no cart. Skipping the request avoids a guaranteed 401 (and
+  // the red console error) on every page load; if the cached login is stale
+  // the 401 branch below still handles it.
+  if (!getCurrentUser()) {
+    _cartCache = [];
+    updateBadgeCount(_cartCache);
+    return [];
+  }
   try {
     const res = await fetch(`${API_BASE}/php/cart.php`, {
       credentials: "include",
@@ -543,6 +551,9 @@ async function getCart() {
  * @param {Array|Object} cart
  * @returns {Promise<Array>} updated cart items
  */
+// true when the most recent single-item add/update was accepted by the server
+let _lastCartOk = true;
+
 async function saveCart(cart) {
   try {
     // ── Clearing the cart (e.g. after placeOrder) ─────────────────────────
@@ -605,8 +616,15 @@ async function saveCart(cart) {
         ),
       );
 
+      // Surface server-side refusals / quantity adjustments instead of
+      // silently showing the customer a cart the server doesn't hold.
+      const refused = results.find((r) => r && r.error);
+      const adjusted = results.find((r) => r && r.notice);
+      if (refused) showToast(refused.error, "error");
+      else if (adjusted) showToast(adjusted.notice);
+
       // Use the last successful response to refresh the cache
-      const last = results.filter(Boolean).pop();
+      const last = results.filter((r) => r && Array.isArray(r.items)).pop();
       _cartCache = last?.items ?? cart;
       updateBadgeCount(_cartCache);
       return _cartCache;
@@ -620,11 +638,23 @@ async function saveCart(cart) {
       body: JSON.stringify(cart),
     });
     if (res.status === 401) {
+      _lastCartOk = false;
       showToast("Please login to add to cart");
       return _cartCache;
     }
-    if (!res.ok) throw new Error(`Cart API ${res.status}`);
+    if (!res.ok) {
+      _lastCartOk = false;
+      let msg = "Could not update your cart. Please try again.";
+      try {
+        const err = await res.json();
+        if (err && err.error) msg = err.error;
+      } catch (_) {}
+      showToast(msg, "error");
+      return _cartCache;
+    }
     const data = await res.json();
+    _lastCartOk = true;
+    if (data.notice) showToast(data.notice);
     _cartCache = data.items ?? _cartCache;
     updateBadgeCount(_cartCache);
     return _cartCache;
@@ -701,6 +731,10 @@ function getWishlist() {
 
 /** Fetch from server, update cache + localStorage. Falls back silently. */
 async function fetchWishlist() {
+  if (!getCurrentUser()) {
+    _wishlistCache = _wishlistFromStorage();
+    return _wishlistCache;
+  }
   try {
     const res = await fetch(`${API_BASE}/php/wishlist.php`, {
       credentials: "include",
@@ -1002,10 +1036,10 @@ function updateProfileUI() {
       : "";
     dd.innerHTML = `
       <div class="pd-header">
-        <div class="pd-avatar">${initials}</div>
+        <div class="pd-avatar">${escapeHtml(initials)}</div>
         <div>
-          <p class="pd-name">Hello, ${user.name?.split(" ")[0] || "there"}${adminBadge}</p>
-          <p class="pd-email">${user.email || ""}</p>
+          <p class="pd-name">Hello, ${escapeHtml(user.name?.split(" ")[0] || "there")}${adminBadge}</p>
+          <p class="pd-email">${escapeHtml(user.email || "")}</p>
         </div>
       </div>
       <div class="pd-divider"></div>
@@ -1118,14 +1152,14 @@ function refreshWishlistPanel() {
           (item, idx) => `
         <div class="wl-item" data-idx="${idx}">
           <div class="wl-img-wrap">
-            <img src="${item.img}" alt="${item.name}" onerror="this.style.opacity='0'" />
-            <button class="wl-remove" data-name="${item.name.replace(/"/g, "&quot;")}">
+            <img src="${escapeHtml(item.img)}" alt="${escapeHtml(item.name)}" onerror="this.style.opacity='0'" />
+            <button class="wl-remove" data-name="${escapeHtml(item.name)}">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <p class="wl-item-name">${item.name}</p>
-          <p class="wl-item-price">${item.price}</p>
-          <button class="wl-add-cart" data-name="${item.name.replace(/"/g, "&quot;")}">Add to Cart</button>
+          <p class="wl-item-name">${escapeHtml(item.name)}</p>
+          <p class="wl-item-price">${escapeHtml(item.price)}</p>
+          <button class="wl-add-cart" data-name="${escapeHtml(item.name)}">Add to Cart</button>
         </div>
       `,
         )
@@ -1286,6 +1320,7 @@ function buildProductModal() {
     }
 
     const modalEl = document.getElementById("product-modal");
+    if (document.getElementById("pm-add-cart")?.disabled) return; // sold out
     const hasSize = modalEl.dataset.hasSize !== "0";
     const size = hasSize
       ? modal.querySelector(".pm-size.active")?.dataset.size || "M"
@@ -1342,6 +1377,7 @@ function buildProductModal() {
 
     await saveCart({ product_id: productId, size, qty: qtyNum });
     await getCart();
+    if (!_lastCartOk) return; // the server refused it; the toast already says why
 
     const addBtn = document.getElementById("pm-add-cart");
     addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Added!`;
@@ -1402,10 +1438,18 @@ function openProductModal(product, categoryKey) {
       ? product.sizes
       : ["XS", "S", "M", "L", "XL"]
   ).map((s) => (typeof s === "string" ? s : s.size));
-  sizesEl.innerHTML = sizeList
-    .map((s) => `<button class="pm-size" data-size="${s}">${s}</button>`)
-    .join("");
-  if (hasSize) {
+  const soldOut = product.in_stock === false;
+  sizesEl.innerHTML = soldOut
+    ? `<p class="pm-soldout-note">Sold out — no sizes currently in stock.</p>`
+    : sizeList
+        .map((s) => `<button class="pm-size" data-size="${escapeHtml(s)}">${escapeHtml(s)}</button>`)
+        .join("");
+  const modalAddBtn = document.getElementById("pm-add-cart");
+  if (modalAddBtn) {
+    modalAddBtn.disabled = soldOut;
+    modalAddBtn.classList.toggle("is-sold-out", soldOut);
+  }
+  if (hasSize && !soldOut) {
     const defaultSize = sizeList.includes("M") ? "M" : sizeList[0];
     sizesEl
       .querySelector(`.pm-size[data-size='${defaultSize}']`)
@@ -1500,12 +1544,16 @@ function buildSearchIndex() {
 let searchIndex = buildSearchIndex();
 
 function highlightText(text, query) {
-  if (!query) return text;
+  // Escape first, then mark matches in the escaped text — never the other
+  // way round, or a product name containing markup would be injected.
+  const safe = escapeHtml(text);
+  if (!query) return safe;
+  const safeQuery = escapeHtml(query);
   const regex = new RegExp(
-    `(${query.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
+    `(${safeQuery.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})`,
     "gi",
   );
-  return text.replace(regex, '<mark class="search-result-highlight">$1</mark>');
+  return safe.replace(regex, '<mark class="search-result-highlight">$1</mark>');
 }
 
 function performSearch(query, resultsContainer) {
@@ -1525,9 +1573,9 @@ function performSearch(query, resultsContainer) {
   resultsContainer.innerHTML = matches
     .map((match) => {
       if (match.type === "category") {
-        return `<div class="search-result-item category-result" data-type="category" data-category="${match.categoryKey}"><div class="search-result-name">${highlightText(match.name, query)}</div><div class="search-result-category">Category</div></div>`;
+        return `<div class="search-result-item category-result" data-type="category" data-category="${escapeHtml(match.categoryKey)}"><div class="search-result-name">${highlightText(match.name, query)}</div><div class="search-result-category">Category</div></div>`;
       } else {
-        return `<div class="search-result-item" data-type="product" data-category="${match.categoryKey}" data-product-name="${match.name.replace(/['"]/g, "&quot;")}"><div class="search-result-name">${highlightText(match.name, query)}</div><div class="search-result-category">in <span>${match.category}</span></div></div>`;
+        return `<div class="search-result-item" data-type="product" data-category="${escapeHtml(match.categoryKey)}" data-product-name="${escapeHtml(match.name)}"><div class="search-result-name">${highlightText(match.name, query)}</div><div class="search-result-category">in <span>${escapeHtml(match.category)}</span></div></div>`;
       }
     })
     .join("");

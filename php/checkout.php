@@ -16,6 +16,7 @@ error_reporting(E_ALL);
 
 session_start();
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/stock.php';
 
 header('Content-Type: application/json');
 
@@ -63,6 +64,7 @@ require_once __DIR__ . '/order-confirmation-email.php';
 // ── Main checkout logic ───────────────────────────────────────────────────────
 try {
     $pdo  = getPDO();
+    stock_ensure_schema($pdo);
     $body = get_json_body();
 
     $items           = $body['items']            ?? [];
@@ -108,26 +110,111 @@ try {
     // a guess based on the chosen payment method.
     $payment_status = ($payment_method === 'cod') ? 'cod' : 'unpaid';
 
-    $validated_items = [];
-    foreach ($items as $item) {
-        $product_id = isset($item['product_id']) ? (int) $item['product_id'] : 0;
-        $qty        = isset($item['qty'])        ? (int) $item['qty']        : 0;
-        $unit_price = isset($item['unit_price']) ? (float) $item['unit_price'] : 0.0;
-        $size       = trim($item['size'] ?? '');
+    // ── Validate items and price them from the catalog ─────────────────────
+    // The client's `unit_price` is deliberately ignored: it is whatever the
+    // browser says it is, so trusting it let anyone buy a ₱299 item for ₱1
+    // (and, for card/GCash, have PayMongo charge that fake total). Every
+    // price below comes from products.price, and every size is resolved
+    // against the size rows that actually carry stock.
+    $valid_sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+    $prodStmt  = $pdo->prepare(
+        "SELECT product_id, name, price FROM products
+         WHERE product_id = :pid AND status = 'active' AND is_active = 1 LIMIT 1"
+    );
+    $sizesStmt = $pdo->prepare('SELECT size FROM product_sizes WHERE product_id = :pid');
 
-        if ($product_id <= 0 || $qty <= 0 || $unit_price <= 0) {
+    $merged = []; // product_id|size => line, so duplicate lines are validated as one
+    foreach ($items as $item) {
+        if (!is_array($item)) {
             ob_end_clean();
             http_response_code(400);
-            echo json_encode(['error' => 'Each item must have valid product_id, qty, and unit_price']);
+            echo json_encode(['error' => 'Invalid item in cart']);
+            exit;
+        }
+        $rawQty = $item['qty'] ?? null;
+        if (!is_int($rawQty) && !(is_string($rawQty) && ctype_digit($rawQty))) {
+            ob_end_clean();
+            http_response_code(400);
+            echo json_encode(['error' => 'Each item must have a whole-number quantity']);
+            exit;
+        }
+        $product_id = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+        $qty        = (int) $rawQty;
+        $size       = strtoupper(trim((string) ($item['size'] ?? '')));
+
+        if ($product_id <= 0 || $qty < 1 || $qty > 99) {
+            ob_end_clean();
+            http_response_code(400);
+            echo json_encode(['error' => 'Each item must have a valid product_id and a quantity between 1 and 99']);
             exit;
         }
 
-        $validated_items[] = [
-            'product_id' => $product_id,
-            'size'       => $size,
-            'qty'        => $qty,
-            'unit_price' => $unit_price,
-        ];
+        $prodStmt->execute([':pid' => $product_id]);
+        $product = $prodStmt->fetch(PDO::FETCH_ASSOC);
+        if (!$product) {
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode(['error' => 'One of the items in your cart is no longer available.', 'code' => 'product_unavailable']);
+            exit;
+        }
+
+        $sizesStmt->execute([':pid' => $product_id]);
+        $productSizes = $sizesStmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!$productSizes) {
+            // No stock row at all means no stock (the storefront already
+            // shows these as 0). It must not mean "unlimited".
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode([
+                'error' => "{$product['name']} is out of stock.",
+                'code'  => 'insufficient_stock',
+            ]);
+            exit;
+        }
+        if ($size === '') {
+            if (count($productSizes) === 1) {
+                $size = $productSizes[0]; // single-variant item (most accessories)
+            } else {
+                ob_end_clean();
+                http_response_code(400);
+                echo json_encode(['error' => "Please choose a size for {$product['name']}.", 'code' => 'size_required']);
+                exit;
+            }
+        }
+        if (!in_array($size, $valid_sizes, true) || !in_array($size, $productSizes, true)) {
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode([
+                'error' => "{$product['name']} isn't available in size {$size}.",
+                'code'  => 'size_unavailable',
+            ]);
+            exit;
+        }
+
+        $key = $product_id . '|' . $size;
+        if (isset($merged[$key])) {
+            $merged[$key]['qty'] += $qty;
+        } else {
+            $merged[$key] = [
+                'product_id' => $product_id,
+                'name'       => $product['name'],
+                'size'       => $size,
+                'qty'        => $qty,
+                'unit_price' => round((float) $product['price'], 2),
+            ];
+        }
+    }
+    // Fixed lock order (product, size) so two multi-item checkouts that
+    // overlap can't deadlock each other.
+    ksort($merged, SORT_NATURAL);
+    $validated_items = array_values($merged);
+    foreach ($validated_items as $line) {
+        if ($line['qty'] > 99 || $line['unit_price'] <= 0) {
+            ob_end_clean();
+            http_response_code(400);
+            echo json_encode(['error' => 'Invalid quantity or price for ' . $line['name']]);
+            exit;
+        }
     }
 
     $subtotal = 0.0;
@@ -199,83 +286,112 @@ try {
     $tax_amount     = round($taxable_amount * ($taxRatePercent / 100), 2);
     $grand_total    = round($subtotal - $discount_amount + $shipping_fee + $tax_amount, 2);
 
-    $pdo->beginTransaction();
+    // ── One checkout per customer at a time + duplicate-submit guard ────────
+    // A double-click on "Place order" (or a retried request) fires the same
+    // checkout twice. Serialise each customer's checkouts, then if an
+    // identical order was created seconds ago, hand that one back instead of
+    // creating a second order and taking the stock twice. The lock is
+    // released automatically when this request's DB connection closes.
+    $lockName = $pdo->quote('styled_checkout_u' . $user_id);
+    if ((int) $pdo->query("SELECT GET_LOCK($lockName, 10)")->fetchColumn() !== 1) {
+        ob_end_clean();
+        http_response_code(429);
+        echo json_encode(['error' => 'Another checkout is already in progress. Please wait a moment.']);
+        exit;
+    }
 
-    // ── Reserve stock ─────────────────────────────────────────────────────
-    // Nothing in this codebase decremented product_sizes.stock_qty on
-    // checkout, on payment confirmation, or anywhere else — the storefront's
-    // "X left" was purely cosmetic and the store could oversell indefinitely.
-    // Decrementing here, inside the same transaction as the order itself,
-    // means a failed/insufficient-stock item rolls back the whole order
-    // (nothing partially created), and the conditional
-    // "stock_qty >= qty" in the UPDATE's WHERE clause makes each decrement
-    // atomic at the database level — two simultaneous checkouts for the
-    // last unit can't both succeed, InnoDB's row lock serializes them and
-    // the second one's UPDATE simply matches 0 rows.
-    //
-    // Items with no matching product_sizes row (no size tracked for that
-    // product/size — true for some of the catalog, e.g. most accessories)
-    // are left alone rather than blocked, since stock was never modeled
-    // for them and blocking would change existing purchasable behavior.
-    $stockStmt = $pdo->prepare(
-        'UPDATE product_sizes SET stock_qty = stock_qty - :qty
-         WHERE product_id = :pid AND size = :size AND stock_qty >= :qty2'
-    );
-    $stockExistsStmt = $pdo->prepare(
-        'SELECT stock_qty FROM product_sizes WHERE product_id = :pid AND size = :size LIMIT 1'
-    );
-    $nameStmt = $pdo->prepare('SELECT name FROM products WHERE product_id = :pid LIMIT 1');
-    $anyRowStmt = $pdo->prepare('SELECT 1 FROM product_sizes WHERE product_id = :pid LIMIT 1');
-
-    foreach ($validated_items as $item) {
-        if ($item['size'] === '') {
-            continue; // no size-level stock tracked for this item
+    $fingerprint = static function (array $lines): string {
+        $m = [];
+        foreach ($lines as $l) {
+            $k = $l['product_id'] . '|' . $l['size'];
+            $m[$k] = ($m[$k] ?? 0) + (int) $l['qty'];
         }
-
-        $stockExistsStmt->execute([':pid' => $item['product_id'], ':size' => $item['size']]);
-        $sizeRow = $stockExistsStmt->fetch(PDO::FETCH_ASSOC);
-        if ($sizeRow === false) {
-            // A product with no size rows at all isn't stock-tracked (allow as
-            // before). But if it HAS size rows and this size isn't one of
-            // them (e.g. XXL), buying it would bypass stock entirely.
-            $anyRowStmt->execute([':pid' => $item['product_id']]);
-            if ($anyRowStmt->fetchColumn() === false) {
-                continue;
-            }
-            $pdo->rollBack();
-            $nameStmt->execute([':pid' => $item['product_id']]);
-            $productName = $nameStmt->fetchColumn() ?: 'One of the items';
+        ksort($m, SORT_NATURAL);
+        return json_encode($m);
+    };
+    $recent = $pdo->prepare(
+        "SELECT order_id, order_number, grand_total, payment_method, payment_status
+         FROM orders
+         WHERE user_id = :uid AND payment_method = :pm AND grand_total = :gt
+           AND status <> 'cancelled' AND created_at >= (NOW() - INTERVAL 15 SECOND)
+         ORDER BY order_id DESC LIMIT 5"
+    );
+    $recent->execute([':uid' => $user_id, ':pm' => $payment_method, ':gt' => $grand_total]);
+    $recentItems = $pdo->prepare('SELECT product_id, size, qty FROM order_items WHERE order_id = ?');
+    foreach ($recent->fetchAll(PDO::FETCH_ASSOC) as $dup) {
+        $recentItems->execute([$dup['order_id']]);
+        if ($fingerprint($recentItems->fetchAll(PDO::FETCH_ASSOC)) === $fingerprint($validated_items)) {
+            $pdo->query("SELECT RELEASE_LOCK($lockName)");
             ob_end_clean();
-            http_response_code(409);
             echo json_encode([
-                'error' => "{$productName} isn't available in size {$item['size']}.",
-                'code'  => 'size_unavailable',
+                'success'          => true,
+                'duplicate'        => true,
+                'order_id'         => (int) $dup['order_id'],
+                'order_number'     => $dup['order_number'],
+                'grand_total'      => (float) $dup['grand_total'],
+                'payment_method'   => $dup['payment_method'],
+                'payment_status'   => $dup['payment_status'],
+                'requires_payment' => $dup['payment_method'] !== 'cod',
             ]);
             exit;
         }
+    }
 
-        $stockStmt->execute([
-            ':qty'   => $item['qty'],
-            ':pid'   => $item['product_id'],
-            ':size'  => $item['size'],
-            ':qty2'  => $item['qty'],
-        ]);
+    // Free up units held by abandoned card/GCash orders first, so they're
+    // available to this customer instead of being reported as sold out.
+    stock_release_stale_holds($pdo);
 
-        if ($stockStmt->rowCount() === 0) {
-            // Someone else's checkout (or a stale cart) already took the
-            // remaining stock between the customer adding to cart and
-            // checking out now.
+    $pdo->beginTransaction();
+
+    // ── Reserve stock ─────────────────────────────────────────────────────
+    // Decrementing inside the same transaction as the order means any
+    // item that can't be covered rolls the whole order back (nothing is
+    // partially created). Each size row is locked (SELECT … FOR UPDATE)
+    // before it is checked, so two simultaneous checkouts for the last unit
+    // are serialised by InnoDB: the second sees 0 and is rejected, and stock
+    // can never go negative. Every reservation is written to the stock
+    // audit log once the order id exists (below), and that log is also what
+    // lets a cancelled/expired order give exactly these units back.
+    $lockStock = $pdo->prepare('SELECT stock_qty FROM product_sizes WHERE product_id = :pid AND size = :size FOR UPDATE');
+    $takeStock = $pdo->prepare(
+        'UPDATE product_sizes SET stock_qty = stock_qty - :qty
+         WHERE product_id = :pid AND size = :size AND stock_qty >= :qty2'
+    );
+    $reservations = [];
+
+    foreach ($validated_items as $item) {
+        $lockStock->execute([':pid' => $item['product_id'], ':size' => $item['size']]);
+        $before = $lockStock->fetchColumn();
+
+        if ($before === false || (int) $before < $item['qty']) {
             $pdo->rollBack();
-            $nameStmt->execute([':pid' => $item['product_id']]);
-            $productName = $nameStmt->fetchColumn() ?: 'One of the items';
             ob_end_clean();
             http_response_code(409);
+            $have = $before === false ? 0 : (int) $before;
             echo json_encode([
-                'error' => "{$productName} (size {$item['size']}) doesn't have enough stock left. Only {$sizeRow['stock_qty']} available.",
+                'error' => $have === 0
+                    ? "{$item['name']} (size {$item['size']}) is out of stock."
+                    : "{$item['name']} (size {$item['size']}) doesn't have enough stock left. Only {$have} available.",
                 'code'  => 'insufficient_stock',
             ]);
             exit;
         }
+
+        $takeStock->execute([
+            ':qty' => $item['qty'], ':pid' => $item['product_id'],
+            ':size' => $item['size'], ':qty2' => $item['qty'],
+        ]);
+        if ($takeStock->rowCount() === 0) {
+            $pdo->rollBack();
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode([
+                'error' => "{$item['name']} (size {$item['size']}) doesn't have enough stock left.",
+                'code'  => 'insufficient_stock',
+            ]);
+            exit;
+        }
+        $reservations[] = $item + ['before' => (int) $before];
     }
 
     // ── Address handling (insert or reuse) ──────────────────────────────────
@@ -364,6 +480,15 @@ try {
             ':qty'        => $item['qty'],
             ':unit_price' => $item['unit_price'],
         ]);
+    }
+
+    // First timeline entry, stamped by the server clock.
+    order_timeline_add($pdo, $order_id, 'Order Placed', null);
+
+    // ── Stock audit log: who/what/when for every unit taken ─────────────────
+    foreach ($reservations as $r) {
+        stock_log($pdo, $r['product_id'], $r['size'], -$r['qty'], $r['before'], $r['before'] - $r['qty'],
+                  'order_reserve', $order_id, $user_id, $order_number);
     }
 
     // ── Clear cart ──────────────────────────────────────────────────────────

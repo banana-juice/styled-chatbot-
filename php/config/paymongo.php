@@ -31,7 +31,12 @@ define('PAYMONGO_SECRET_KEY', getenv('PAYMONGO_SECRET_KEY') ?: 'PAYMONGO_SECRET_
 define('PAYMONGO_PUBLIC_KEY', getenv('PAYMONGO_PUBLIC_KEY') ?: 'PAYMONGO_PUBLIC_KEY');
 
 // Dashboard > Developers > Webhooks > (your webhook) > Signing Secret
-define('PAYMONGO_WEBHOOK_SECRET', getenv('PAYMONGO_WEBHOOK_SECRET') ?: 'PAYMONGO_WEBHOOK_SECRET');
+// No default on purpose. This used to fall back to the literal string
+// 'PAYMONGO_WEBHOOK_SECRET', which silently made every real PayMongo webhook
+// fail signature verification (so no order ever became "paid" on its own)
+// while also being a publicly guessable signing key. An unset secret now
+// makes the webhook refuse to run and say why.
+define('PAYMONGO_WEBHOOK_SECRET', getenv('PAYMONGO_WEBHOOK_SECRET') ?: '');
 
 // Base URL of the deployed site, NO trailing slash. Used to build the
 // success_url / cancel_url PayMongo redirects the customer back to.
