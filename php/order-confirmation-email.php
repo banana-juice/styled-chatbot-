@@ -69,7 +69,8 @@ function send_order_confirmation(
         $shippingAddress['zip_code'] ?? '',
     ])) . ', Philippines';
 
-    $firstName = htmlspecialchars($toName);
+    $addrHtml  = htmlspecialchars($addrLine, ENT_QUOTES, 'UTF-8');
+    $firstName = htmlspecialchars($toName, ENT_QUOTES, 'UTF-8');
 
     $html = <<<HTML
     <!DOCTYPE html>
@@ -132,7 +133,7 @@ function send_order_confirmation(
                   <tr>
                     <td width="50%" style="vertical-align:top;padding-right:16px;">
                       <p style="margin:0 0 6px;font-weight:500;color:#7a6a5a;text-transform:uppercase;font-size:11px;letter-spacing:1px;">Shipping To</p>
-                      <p style="margin:0;line-height:1.6;">{$addrLine}</p>
+                      <p style="margin:0;line-height:1.6;">{$addrHtml}</p>
                     </td>
                     <td width="50%" style="vertical-align:top;">
                       <p style="margin:0 0 6px;font-weight:500;color:#7a6a5a;text-transform:uppercase;font-size:11px;letter-spacing:1px;">Payment Method</p>

@@ -53,14 +53,14 @@ function send_order_status_email($pdo, $orderId, $oldStatus, $newStatus, $tracki
     $paymentDisplay = $paymentMap[strtolower($order['payment_method'])] ?? ucfirst($order['payment_method']);
 
     $addrParts = array_filter([$order['street'], $order['city'], $order['province'], $order['zip_code']]);
-    $address = implode(', ', $addrParts) . ', Philippines';
+    $address = htmlspecialchars(implode(', ', $addrParts) . ', Philippines', ENT_QUOTES, 'UTF-8');
 
     $itemsHtml = '';
     foreach ($items as $item) {
         $sizeHtml = $item['size'] ? ' (' . htmlspecialchars($item['size']) . ')' : '';
         $lineTotal = $item['unit_price'] * $item['qty'];
         $itemsHtml .= "<tr>
-            <td style='padding:10px 8px;border-bottom:1px solid #f0ebe5;'>{$item['product_name']}{$sizeHtml}</td>
+            <td style='padding:10px 8px;border-bottom:1px solid #f0ebe5;'>" . htmlspecialchars((string) $item['product_name'], ENT_QUOTES, 'UTF-8') . "{$sizeHtml}</td>
             <td style='padding:10px 8px;border-bottom:1px solid #f0ebe5;text-align:center;'>{$item['qty']}</td>
             <td style='padding:10px 8px;border-bottom:1px solid #f0ebe5;text-align:right;'>₱" . number_format($item['unit_price'], 2) . "</td>
             <td style='padding:10px 8px;border-bottom:1px solid #f0ebe5;text-align:right;'>₱" . number_format($lineTotal, 2) . "</td>
