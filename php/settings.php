@@ -20,7 +20,7 @@ if ($method !== 'GET') {
     exit;
 }
 
-$group = $_GET['group'] ?? '';
+$group = is_string($_GET['group'] ?? null) ? $_GET['group'] : '';
 $allowedGroups = ['store', 'payment', 'shipping', 'tax'];
 if (!$group || !in_array($group, $allowedGroups)) {
     http_response_code(400);

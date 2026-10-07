@@ -8,6 +8,13 @@ loadEnv();
 // so the same order could show different times on different pages (or
 // shift entirely after a hosting move). Asia/Manila (+08:00, no DST) is the
 // store's local time.
+// Never print PHP warnings/notices into a response: they expose the server's file
+// paths and break the JSON the pages expect. (php/.user.ini is supposed to do
+// this but isn't honoured on the free host, so it's enforced here, in the one
+// file every endpoint loads. Errors still go to the error log.)
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+
 define('APP_TIMEZONE', 'Asia/Manila');
 define('APP_TZ_OFFSET', '+08:00');
 date_default_timezone_set(APP_TIMEZONE);
