@@ -30,8 +30,8 @@ require_once __DIR__ . '/../db.php';
 
 // ── 1. Read input ─────────────────────────────────────────────────────────────
 $input = json_decode(file_get_contents('php://input'), true);
-$email = trim($input['email'] ?? '');
-$code  = trim($input['code']  ?? '');
+$email = trim(as_text($input['email'] ?? ''));
+$code  = trim(as_text($input['code'] ?? ''));
 
 if (empty($email) || empty($code)) {
     http_response_code(400);

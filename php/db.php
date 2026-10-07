@@ -46,6 +46,11 @@ function as_pos_int($v): int {
     return 0;
 }
 
+/** Text input only: anything that isn't a string (array, object, number, null) becomes ''. */
+function as_text($v): string {
+    return is_string($v) ? $v : '';
+}
+
 function getPDO(): PDO {
     static $pdo = null;
 

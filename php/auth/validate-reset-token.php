@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 
 require_once __DIR__ . '/../db.php';
 
-$token = trim($_GET['token'] ?? '');
+$token = trim(as_text($_GET['token'] ?? ''));
 
 if (empty($token)) {
     echo json_encode(['valid' => false]);

@@ -30,8 +30,8 @@ require_once __DIR__ . '/../db.php';
 
 // ── 1. Read input ─────────────────────────────────────────────────────────────
 $input        = json_decode(file_get_contents('php://input'), true);
-$token        = trim($input['token']        ?? '');
-$new_password = $input['new_password']      ?? '';
+$token        = trim(as_text($input['token'] ?? ''));
+$new_password = as_text($input['new_password']      ?? '');
 
 if (empty($token) || empty($new_password)) {
     http_response_code(400);

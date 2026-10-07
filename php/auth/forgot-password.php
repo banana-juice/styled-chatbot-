@@ -31,7 +31,7 @@ require_once __DIR__ . '/../brevo_email.php';
 
 // ── 1. Read input ─────────────────────────────────────────────────────────────
 $input = json_decode(file_get_contents('php://input'), true);
-$email = trim($input['email'] ?? '');
+$email = trim(as_text($input['email'] ?? ''));
 
 // Always return a generic "success" response for security, even if email is missing or invalid.
 if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {

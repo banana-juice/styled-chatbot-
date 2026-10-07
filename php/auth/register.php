@@ -32,9 +32,9 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../brevo_email.php';
 
 $input = json_decode(file_get_contents('php://input'), true);
-$full_name = trim($input['full_name'] ?? '');
-$email = trim($input['email'] ?? '');
-$password = $input['password'] ?? '';
+$full_name = trim(as_text($input['full_name'] ?? ''));
+$email = trim(as_text($input['email'] ?? ''));
+$password = as_text($input['password'] ?? '');
 
 // Validation
 $errors = [];
