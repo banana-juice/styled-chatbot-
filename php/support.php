@@ -794,12 +794,12 @@ PROMPT;
 // ── 5. Call the Anthropic API, looping while Claude wants to use a tool ─────
 $apiKey = env_value('ANTHROPIC_API_KEY');
 if (!$apiKey) {
-    error_log('chatbot.php: ANTHROPIC_API_KEY is not set.');
+    error_log('support.php: ANTHROPIC_API_KEY is not set.');
     chatFail(500, 'Chat support is temporarily unavailable. Please try again later.', 'no_api_key',
         'ANTHROPIC_API_KEY is not set. Copy .env.example to .env in the project root and add your key.');
 }
 if (!function_exists('curl_init')) {
-    error_log('chatbot.php: the PHP curl extension is not enabled.');
+    error_log('support.php: the PHP curl extension is not enabled.');
     chatFail(500, 'Chat support is temporarily unavailable. Please try again later.', 'no_curl',
         'The PHP curl extension is disabled. In php.ini remove the leading ; from extension=curl, then restart Apache.');
 }
@@ -866,7 +866,7 @@ for ($round = 0; $round <= MAX_TOOL_ROUNDS; $round++) {
 
     $call = callAnthropicMessages($apiKey, $payload);
     if (!$call['ok']) {
-        error_log('chatbot.php: ' . $call['type'] . ' - ' . $call['detail']);
+        error_log('support.php: ' . $call['type'] . ' - ' . $call['detail']);
         $publicMessage = $call['type'] === 'network'
             ? 'Could not reach support chat right now. Please try again.'
             : 'Support chat had trouble responding. Please try again.';
@@ -910,7 +910,7 @@ for ($round = 0; $round <= MAX_TOOL_ROUNDS; $round++) {
 
 // ── 6. Send the final reply ──────────────────────────────────────────────────
 if ($finalReply === null || trim($finalReply) === '') {
-    error_log('chatbot.php: exhausted tool-call rounds without a final text reply.');
+    error_log('support.php: exhausted tool-call rounds without a final text reply.');
     chatFail(502, 'Support chat had trouble responding. Please try again.', 'empty_reply',
         'Hit MAX_TOOL_ROUNDS (' . MAX_TOOL_ROUNDS . ') or got an empty text reply.');
 }

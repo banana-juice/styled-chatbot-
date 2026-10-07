@@ -14,7 +14,7 @@ date_default_timezone_set(APP_TIMEZONE);
 
 // DB_* come from the environment (.env) so the same code works locally and
 // in production without ever hardcoding a real credential in a committed
-// file — same pattern as ANTHROPIC_API_KEY in php/chatbot.php. Falls back
+// file — same pattern as ANTHROPIC_API_KEY in php/support.php. Falls back
 // to XAMPP's local defaults when nothing is set, so local dev needs no
 // .env entries at all.
 define('DB_HOST', env_value('DB_HOST') ?: 'localhost');

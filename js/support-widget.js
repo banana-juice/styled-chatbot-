@@ -1,8 +1,8 @@
 // ============================================
-// CHAT WIDGET — js/chatbot.js
+// CHAT WIDGET — js/support-widget.js
 // ============================================
 // Floating customer-support chat bubble, powered by Claude via
-// php/chatbot.php. This file only renders UI and relays messages — every
+// php/support.php. This file only renders UI and relays messages — every
 // piece of account data it displays is decided server-side, scoped to the
 // logged-in session user. Loaded after js/main.js (uses getCurrentUser()).
 
@@ -131,7 +131,7 @@
     const text = inputEl.value.trim();
     if (!text) return;
 
-    // Quick client-side UX hint only — php/chatbot.php enforces the real
+    // Quick client-side UX hint only — php/support.php enforces the real
     // session check server-side and returns 401 if the session is gone.
     const user = typeof getCurrentUser === "function" ? getCurrentUser() : null;
     if (!user) {
@@ -158,7 +158,7 @@
     scrollToBottom();
 
     try {
-      const res = await fetch("php/chatbot.php", {
+      const res = await fetch("php/support.php", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

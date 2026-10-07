@@ -3,7 +3,7 @@
 // PayMongo API credentials — STYLED payment gateway integration
 // ============================================================
 // Real values come from .env (git-ignored), never from this file directly —
-// same pattern as ANTHROPIC_API_KEY in php/chatbot.php and DB_* in
+// same pattern as ANTHROPIC_API_KEY in php/support.php and DB_* in
 // php/db.php. This keeps a real key from ever landing in a commit even if
 // someone edits the constant here directly out of habit.
 //
