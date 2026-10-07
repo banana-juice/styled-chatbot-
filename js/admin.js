@@ -375,8 +375,9 @@ let ordersStatusFilter = "";
 let ordersSearch = "";
 const ORDERS_PER_PAGE = 8;
 
-async function renderOrdersTable() {
-  tableLoading("orders-body", 7);
+// quiet = background refresh: no "Loading…" flash, and failures stay silent.
+async function renderOrdersTable(quiet = false) {
+  if (!quiet) tableLoading("orders-body", 7);
 const params = new URLSearchParams({
   page: ordersPage,
   limit: ORDERS_PER_PAGE,
@@ -423,9 +424,24 @@ const params = new URLSearchParams({
     );
   } catch (err) {
     console.error("[admin]", err);
-    tableError("orders-body", 7);
+    if (!quiet) tableError("orders-body", 7);
   }
 }
+
+// The server asks PayMongo about unpaid orders each time the list loads, so
+// simply reloading it shows a payment that just cleared. Refresh while the
+// admin is looking at the list; pause when the tab is hidden.
+setInterval(() => {
+  const listView = document.getElementById("orders-list-view");
+  if (
+    currentPage === "orders" &&
+    !document.hidden &&
+    listView &&
+    listView.style.display !== "none"
+  ) {
+    renderOrdersTable(true);
+  }
+}, 20000);
 
 function filterOrders(q) {
   ordersSearch = q;
@@ -451,7 +467,14 @@ function filterOrdersByPaymentStatus(status) {
   renderOrdersTable();
 }
 
+let _adminPayWatch = null;
+function stopAdminPayWatch() {
+  if (_adminPayWatch) clearInterval(_adminPayWatch);
+  _adminPayWatch = null;
+}
+
 function showOrdersList() {
+  stopAdminPayWatch();
   document.getElementById("orders-list-view").style.display = "";
   document.getElementById("orders-detail-view").style.display = "none";
 }
@@ -468,6 +491,22 @@ async function openOrderDetail(orderNumber) {
     const data = await fetchJSON(`${API}/orders.php?id=${orderNumber}`);
     if (!data.success) return;
     const o = data.order;
+
+    // An order still "Processing" payment: keep checking so the badge flips to
+    // Paid by itself the moment PayMongo confirms.
+    stopAdminPayWatch();
+    if (o.payment_status === "processing") {
+      const num = o.order_number;
+      _adminPayWatch = setInterval(async () => {
+        try {
+          const f = await fetchJSON(`${API}/orders.php?id=${encodeURIComponent(num)}`);
+          if (f.success && f.order.payment_status !== "processing") {
+            stopAdminPayWatch();
+            openOrderDetail(num);
+          }
+        } catch (_) {}
+      }, 8000);
+    }
 
     document.getElementById("detail-order-id").textContent =
       "Order #" + o.order_number;

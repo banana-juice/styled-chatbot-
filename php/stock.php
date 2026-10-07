@@ -53,18 +53,26 @@ function stock_ensure_schema(PDO $pdo): void {
     ");
 
     $wanted = [
-        'failed_at'    => 'DATETIME NULL',
-        'cancelled_at' => 'DATETIME NULL',
-        'updated_at'   => 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        'orders' => [
+            'failed_at'    => 'DATETIME NULL',
+            'cancelled_at' => 'DATETIME NULL',
+            'updated_at'   => 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+        ],
+        // when we last asked PayMongo whether this payment went through
+        'payment_transactions' => ['checked_at' => 'DATETIME NULL'],
+        // so a saved address can carry the customer's phone for next time
+        'addresses' => ['phone' => 'VARCHAR(30) NULL'],
     ];
-    $existing = $pdo->query(
-        "SELECT column_name FROM information_schema.columns
-         WHERE table_schema = DATABASE() AND table_name = 'orders'"
-    )->fetchAll(PDO::FETCH_COLUMN);
-    $existing = array_map('strtolower', $existing);
-    foreach ($wanted as $col => $ddl) {
-        if (!in_array($col, $existing, true)) {
-            $pdo->exec("ALTER TABLE orders ADD COLUMN $col $ddl");
+    foreach ($wanted as $table => $cols) {
+        $existing = $pdo->query(
+            "SELECT column_name FROM information_schema.columns
+             WHERE table_schema = DATABASE() AND table_name = " . $pdo->quote($table)
+        )->fetchAll(PDO::FETCH_COLUMN);
+        $existing = array_map('strtolower', $existing);
+        foreach ($cols as $col => $ddl) {
+            if (!in_array($col, $existing, true)) {
+                $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$col` $ddl");
+            }
         }
     }
 }
@@ -282,7 +290,18 @@ function stock_release_stale_holds(PDO $pdo): int {
              LIMIT 50"
         );
         $stmt->execute();
+        require_once __DIR__ . '/payments.php';
+        $asked = 0;
         foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $oid) {
+            // Before giving up on an unpaid order, ask PayMongo whether the
+            // customer actually paid (the webhook may not have reached us).
+            // Paid orders are never cancelled by this sweep.
+            if ($asked < 5) {
+                $asked++;
+                if (payment_reconcile_order($pdo, (int) $oid) === 'paid') {
+                    continue;
+                }
+            }
             if (order_cancel_and_release($pdo, (int) $oid, 'failed', 'hold_expired',
                     'Payment was not completed in time; the order was released.')) {
                 $n++;

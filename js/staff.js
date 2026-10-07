@@ -341,8 +341,9 @@ async function renderDashboard() {
 }
 
 // ========== ORDERS ==========
-async function renderOrdersTable() {
-  tableLoading("orders-body", 6);
+// quiet = background refresh: no "Loading…" flash, failures stay silent.
+async function renderOrdersTable(quiet = false) {
+  if (!quiet) tableLoading("orders-body", 6);
   const params = new URLSearchParams({
     page: ordersPage,
     limit: ORDERS_PER_PAGE,
@@ -380,7 +381,7 @@ async function renderOrdersTable() {
       "function(p){ordersPage=p;renderOrdersTable();}",
     );
   } catch (err) {
-    tableError("orders-body", 6);
+    if (!quiet) tableError("orders-body", 6);
   }
 }
 
@@ -389,6 +390,20 @@ function filterOrders(q) {
   ordersPage = 1;
   renderOrdersTable();
 }
+// The server asks PayMongo about unpaid orders whenever the list loads, so a
+// periodic reload shows a payment as soon as it clears.
+setInterval(() => {
+  const listView = document.getElementById("orders-list-view");
+  if (
+    currentPage === "orders" &&
+    !document.hidden &&
+    listView &&
+    listView.style.display !== "none"
+  ) {
+    renderOrdersTable(true);
+  }
+}, 20000);
+
 function sortOrders(dir) {
   ordersSort = dir === "desc" ? "desc" : "asc";
   ordersPage = 1;

@@ -20,6 +20,7 @@
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/stock.php';
 require_once __DIR__ . '/paymongo_client.php';
+require_once __DIR__ . '/payments.php';
 require_once __DIR__ . '/order-confirmation-email.php';
 
 // ── TEMPORARY DEBUG LOGGING ─────────────────────────────────────────────
@@ -150,90 +151,10 @@ try {
 
     if ($eventType === 'checkout_session.payment.paid') {
         debug_log('Event matched checkout_session.payment.paid — attempting to mark order as paid');
-        if ($order['payment_status'] !== 'paid') {
-            stock_ensure_schema($pdo);
-            $pdo->beginTransaction();
-            $lockO = $pdo->prepare('SELECT status, payment_status FROM orders WHERE order_id = ? FOR UPDATE');
-            $lockO->execute([$order['order_id']]);
-            $fresh = $lockO->fetch(PDO::FETCH_ASSOC);
-
-            if ($fresh && $fresh['payment_status'] === 'paid') {
-                $pdo->rollBack(); // a concurrent delivery of the same event got here first
-                debug_log('Concurrent duplicate paid event, skipping');
-                http_response_code(200);
-                echo json_encode(['received' => true]);
-                exit;
-            }
-
-            $lateNote = null;
-            $newStatusSql = 'IF(status = "pending", "processing", status)';
-            if ($fresh && $fresh['status'] === 'cancelled') {
-                // The customer paid after we had already released this order's
-                // stock (hold expired / they cancelled, then paid on the old
-                // PayMongo page). Money has been taken, so try to take the
-                // units back; if they're gone, flag it for a manual refund.
-                if (stock_rereserve_order($pdo, (int) $order['order_id'])) {
-                    $newStatusSql = '"processing"';
-                    $lateNote = 'Payment received after the stock hold expired; stock re-reserved and order reopened.';
-                } else {
-                    $newStatusSql = '"cancelled"';
-                    $lateNote = 'REFUND REQUIRED: payment received after the stock hold expired and the items are no longer available.';
-                }
-            }
-
-            $pdo->prepare('
-                UPDATE orders
-                SET payment_status = "paid", paid_at = NOW(),
-                    cancelled_at = IF(' . $newStatusSql . ' = "cancelled", cancelled_at, NULL),
-                    status = ' . $newStatusSql . '
-                WHERE order_id = :oid
-            ')->execute([':oid' => $order['order_id']]);
-            order_timeline_add($pdo, (int) $order['order_id'], 'Payment Received', $lateNote);
-            $pdo->commit();
-            debug_log('UPDATE orders SET payment_status=paid executed for order_id=' . $order['order_id']);
-
-            if ($txnId) {
-                $pdo->prepare('UPDATE payment_transactions SET status = "paid" WHERE transaction_id = :tid')
-                    ->execute([':tid' => $txnId]);
-            }
-
-            // Now that payment is actually confirmed, send the order
-            // confirmation email (this was deliberately skipped in
-            // checkout.php for card/gcash orders — see that file).
-            $itemsStmt = $pdo->prepare('SELECT product_id, size, qty, unit_price FROM order_items WHERE order_id = :oid');
-            $itemsStmt->execute([':oid' => $order['order_id']]);
-            $items = $itemsStmt->fetchAll(PDO::FETCH_ASSOC);
-
-            $addrStmt = $pdo->prepare('
-                SELECT a.street, a.city, a.province, a.zip_code
-                FROM orders o JOIN addresses a ON a.address_id = o.address_id
-                WHERE o.order_id = :oid
-            ');
-            $addrStmt->execute([':oid' => $order['order_id']]);
-            $shippingAddress = $addrStmt->fetch(PDO::FETCH_ASSOC) ?: [];
-
-            $totalsStmt = $pdo->prepare('SELECT subtotal, shipping_fee, grand_total, payment_method FROM orders WHERE order_id = :oid');
-            $totalsStmt->execute([':oid' => $order['order_id']]);
-            $totals = $totalsStmt->fetch(PDO::FETCH_ASSOC);
-
-            try {
-                send_order_confirmation(
-                    $order['email'],
-                    explode(' ', $order['full_name'])[0] ?? 'Valued Customer',
-                    $order['order_number'],
-                    $items,
-                    $pdo,
-                    (float) $totals['subtotal'],
-                    (float) $totals['shipping_fee'],
-                    (float) $totals['grand_total'],
-                    $totals['payment_method'],
-                    $shippingAddress
-                );
-                debug_log('send_order_confirmation: SUCCESS');
-            } catch (Throwable $mailErr) {
-                debug_log('send_order_confirmation FAILED: ' . $mailErr->getMessage());
-                error_log('PayMongo webhook: confirmation email failed: ' . $mailErr->getMessage());
-            }
+        // Same code path the "ask PayMongo" check uses, so an order can never be
+        // marked paid (or emailed) twice, whichever of the two gets there first.
+        if (payment_mark_paid($pdo, (int) $order['order_id'], 'webhook')) {
+            debug_log('Order marked paid via webhook: order_id=' . $order['order_id']);
         } else {
             debug_log('Order was already payment_status=paid, skipping update+email (idempotent)');
         }

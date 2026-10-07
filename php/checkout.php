@@ -89,6 +89,25 @@ try {
         }
     }
 
+    // Field lengths match the columns they're stored in; phone is optional but
+    // must look like a phone number when given.
+    $limits = ['street' => 255, 'city' => 100, 'province' => 100, 'zip_code' => 10];
+    foreach ($limits as $key => $max) {
+        if (!is_string($shipping_address[$key]) || mb_strlen(trim($shipping_address[$key])) > $max) {
+            ob_end_clean();
+            http_response_code(400);
+            echo json_encode(['error' => "shipping_address.$key is too long or invalid"]);
+            exit;
+        }
+    }
+    $phone = trim((string) ($shipping_address['phone'] ?? ''));
+    if ($phone !== '' && !preg_match('/^[0-9+()\-\s]{7,30}$/', $phone)) {
+        ob_end_clean();
+        http_response_code(400);
+        echo json_encode(['error' => 'Please enter a valid phone number']);
+        exit;
+    }
+
     if ($payment_method === '') {
         ob_end_clean();
         http_response_code(400);
@@ -309,16 +328,27 @@ try {
         ksort($m, SORT_NATURAL);
         return json_encode($m);
     };
+    // Same address too: re-submitting the same items to a DIFFERENT address is a
+    // real new order, not a double-click.
     $recent = $pdo->prepare(
-        "SELECT order_id, order_number, grand_total, payment_method, payment_status
-         FROM orders
-         WHERE user_id = :uid AND payment_method = :pm AND grand_total = :gt
-           AND status <> 'cancelled' AND created_at >= (NOW() - INTERVAL 15 SECOND)
-         ORDER BY order_id DESC LIMIT 5"
+        "SELECT o.order_id, o.order_number, o.grand_total, o.payment_method, o.payment_status,
+                a.street, a.city, a.province, a.zip_code
+         FROM orders o
+         LEFT JOIN addresses a ON a.address_id = o.address_id
+         WHERE o.user_id = :uid AND o.payment_method = :pm AND o.grand_total = :gt
+           AND o.status <> 'cancelled' AND o.created_at >= (NOW() - INTERVAL 15 SECOND)
+         ORDER BY o.order_id DESC LIMIT 5"
     );
     $recent->execute([':uid' => $user_id, ':pm' => $payment_method, ':gt' => $grand_total]);
     $recentItems = $pdo->prepare('SELECT product_id, size, qty FROM order_items WHERE order_id = ?');
+    $norm = static fn($v) => mb_strtolower(trim((string) $v));
     foreach ($recent->fetchAll(PDO::FETCH_ASSOC) as $dup) {
+        if ($norm($dup['street']) !== $norm($shipping_address['street'])
+            || $norm($dup['city']) !== $norm($shipping_address['city'])
+            || $norm($dup['province']) !== $norm($shipping_address['province'])
+            || $norm($dup['zip_code']) !== $norm($shipping_address['zip_code'])) {
+            continue;
+        }
         $recentItems->execute([$dup['order_id']]);
         if ($fingerprint($recentItems->fetchAll(PDO::FETCH_ASSOC)) === $fingerprint($validated_items)) {
             $pdo->query("SELECT RELEASE_LOCK($lockName)");
@@ -420,10 +450,14 @@ try {
 
     if ($existing_addr) {
         $address_id = (int) $existing_addr['address_id'];
+        if ($phone !== '') {
+            $pdo->prepare('UPDATE addresses SET phone = :ph WHERE address_id = :aid')
+                ->execute([':ph' => $phone, ':aid' => $address_id]);
+        }
     } else {
         $ins_addr = $pdo->prepare('
-            INSERT INTO addresses (user_id, label, street, city, province, zip_code, is_default)
-            VALUES (:uid, :label, :street, :city, :province, :zip, 0)
+            INSERT INTO addresses (user_id, label, street, city, province, zip_code, phone, is_default)
+            VALUES (:uid, :label, :street, :city, :province, :zip, :ph, 0)
         ');
         $ins_addr->execute([
             ':uid'      => $user_id,
@@ -432,9 +466,15 @@ try {
             ':city'     => $city,
             ':province' => $province,
             ':zip'      => $zip_code,
+            ':ph'       => $phone !== '' ? $phone : null,
         ]);
         $address_id = (int) $pdo->lastInsertId();
     }
+
+    // The address used for this order becomes the one pre-filled next time, so
+    // the customer only has to type an address again if it changes.
+    $pdo->prepare('UPDATE addresses SET is_default = (address_id = :aid) WHERE user_id = :uid')
+        ->execute([':aid' => $address_id, ':uid' => $user_id]);
 
     $order_number = generate_order_number($pdo);
 

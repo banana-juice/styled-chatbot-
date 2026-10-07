@@ -181,10 +181,38 @@ function renderTrackingStepper(trackingData) {
   stepper.innerHTML = metaHTML + stepsHTML;
 }
 
-function openOrderDetail(order) {
+// ── Live payment status ─────────────────────────────────────────────────────
+// After PayMongo sends the customer back, the order can still read "Payment
+// Processing" for a few seconds. The server asks PayMongo directly every time
+// the order is loaded, so we just reload it every few seconds and flip the
+// screen to Paid (or Failed) the moment it changes — no manual refresh needed.
+let _payWatch = null;
+
+function stopPaymentWatch() {
+  if (_payWatch) clearInterval(_payWatch);
+  _payWatch = null;
+}
+
+function startPaymentWatch(orderNumber) {
+  stopPaymentWatch();
+  const startedAt = Date.now();
+  _payWatch = setInterval(async () => {
+    if (Date.now() - startedAt > 3 * 60 * 1000) return stopPaymentWatch();
+    const fresh = await fetchOrder(orderNumber);
+    if (!fresh || fresh.payment_status === "processing") return;
+    stopPaymentWatch();
+    openOrderDetail(fresh, { silent: true });
+    renderOrderList();
+    if (fresh.payment_status === "paid") {
+      showToast?.("Payment confirmed — thank you! Your order is being prepared.", "ok");
+    }
+  }, 4000);
+}
+
+function openOrderDetail(order, opts = {}) {
   document.getElementById("view-list").style.display = "none";
   document.getElementById("view-detail").style.display = "block";
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  if (!opts.silent) window.scrollTo({ top: 0, behavior: "smooth" });
 
   document.getElementById("od-num").textContent = order.id;
   const statusBadge = document.getElementById("od-status-badge");
@@ -230,6 +258,10 @@ function openOrderDetail(order) {
     document.getElementById("od-tax").textContent = order.tax_display || "";
   }
   document.getElementById("od-grand").textContent = order.total;
+
+  // Still waiting on PayMongo? Keep this screen current until it settles.
+  if (order.payment_status === "processing") startPaymentWatch(order.id);
+  else stopPaymentWatch();
 }
 
 // Every payment event carries its own server-set timestamp (Asia/Manila).
@@ -328,6 +360,7 @@ function renderOrderItems(items) {
 }
 
 document.getElementById("back-btn")?.addEventListener("click", () => {
+  stopPaymentWatch();
   document.getElementById("view-detail").style.display = "none";
   document.getElementById("view-list").style.display = "block";
   window.scrollTo({ top: 0, behavior: "smooth" });

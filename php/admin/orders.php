@@ -14,6 +14,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../stock.php';
+require_once __DIR__ . '/../payments.php';
 require_once __DIR__ . '/../paymongo_client.php';
 require_once __DIR__ . '/../email-functions.php';
 require_once __DIR__ . '/../order-confirmation-email.php';  
@@ -27,6 +28,12 @@ if ($method === 'GET') {
 
     // Single order
     if (!empty($_GET['id'])) {
+        // Make sure the payment status is current before the admin reads it.
+        $pending = $pdo->prepare("SELECT order_id FROM orders WHERE order_number = ?
+            AND payment_method <> 'cod' AND payment_status IN ('unpaid', 'processing')");
+        $pending->execute([$_GET['id']]);
+        payment_reconcile_orders($pdo, $pending->fetchAll(PDO::FETCH_COLUMN), 1);
+
         $stmt = $pdo->prepare("
 SELECT o.*,
            o.grand_total AS total_amount,  
@@ -136,6 +143,24 @@ $total = $pdo->prepare("
 ");
 $total->execute($params);
 $totalCount = (int) $total->fetchColumn();
+
+// Ask PayMongo about any unpaid online orders on this page first, so a payment
+// that just cleared shows as Paid without waiting for the webhook.
+$idStmt = $pdo->prepare("
+    SELECT o.order_id FROM orders o
+    LEFT JOIN users u ON u.user_id = o.user_id
+    $whereSQL
+    ORDER BY o.created_at $dir, o.order_id $dir
+    LIMIT $limit OFFSET $offset
+");
+$idStmt->execute($params);
+$pageIds = $idStmt->fetchAll(PDO::FETCH_COLUMN);
+if ($pageIds) {
+    $in = implode(',', array_map('intval', $pageIds));
+    $waiting = $pdo->query("SELECT order_id FROM orders WHERE order_id IN ($in)
+        AND payment_method <> 'cod' AND payment_status IN ('unpaid', 'processing')")->fetchAll(PDO::FETCH_COLUMN);
+    payment_reconcile_orders($pdo, $waiting, 5);
+}
 
 $stmt = $pdo->prepare("
     SELECT o.order_id, o.order_number, o.status, o.payment_method, o.payment_status,

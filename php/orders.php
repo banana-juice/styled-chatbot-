@@ -17,6 +17,7 @@ header('Content-Type: application/json');
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/stock.php';
+require_once __DIR__ . '/payments.php';
 
 $pdo = getPDO();
 stock_ensure_schema($pdo);
@@ -35,6 +36,23 @@ if ($method !== 'GET') {
     http_response_code(405);
     echo json_encode(['error' => 'Method not allowed']);
     exit;
+}
+
+// Bring this customer's still-unpaid online orders up to date with PayMongo
+// before we show them, so a payment that just went through shows as Paid right
+// away instead of waiting for the webhook. Only their own orders, only those
+// waiting on payment, at most a few per request.
+{
+    $sql = "SELECT order_id FROM orders
+            WHERE user_id = ? AND payment_method <> 'cod' AND payment_status IN ('unpaid', 'processing')";
+    $args = [$user_id];
+    if (!empty($_GET['id'])) {
+        $sql .= ' AND order_number = ?';
+        $args[] = trim($_GET['id']);
+    }
+    $w = $pdo->prepare($sql . ' ORDER BY order_id DESC LIMIT 5');
+    $w->execute($args);
+    payment_reconcile_orders($pdo, $w->fetchAll(PDO::FETCH_COLUMN), 5);
 }
 
 function formatPrice($num) {

@@ -371,6 +371,7 @@ async function placeOrderInner() {
     city: document.getElementById("co-city").value.trim(),
     province: document.getElementById("co-province").value.trim(),
     zip_code: document.getElementById("co-zip").value.trim(),
+    phone: document.getElementById("co-phone").value.trim(),
   };
 
   const btn = document.getElementById("place-order-btn");
@@ -450,10 +451,99 @@ async function placeOrderInner() {
   }
 }
 
+// ── Saved details: only ask for an address when it has changed ───────────────
+// The customer's last-used name, email, phone and address come back from
+// php/address.php and fill the form, so a returning customer can place an order
+// without typing any of it. Editing a field simply means "use this instead":
+// checkout.php saves the new one and it becomes the pre-filled address next time.
+let savedAddress = null;
+
+function sameAddress(a, b) {
+  const n = (v) => String(v || "").trim().toLowerCase();
+  return (
+    n(a.street) === n(b.street) &&
+    n(a.city) === n(b.city) &&
+    n(a.province) === n(b.province) &&
+    n(a.zip_code) === n(b.zip_code)
+  );
+}
+
+function updateSavedAddressNote() {
+  const note = document.getElementById("saved-address-note");
+  if (!note || !savedAddress) return;
+  const now = {
+    street: document.getElementById("co-address").value,
+    city: document.getElementById("co-city").value,
+    province: document.getElementById("co-province").value,
+    zip_code: document.getElementById("co-zip").value,
+  };
+  if (sameAddress(now, savedAddress)) {
+    note.textContent =
+      "✓ Using your saved address. Change any field to ship somewhere else.";
+    note.style.color = "var(--text-muted)";
+  } else {
+    note.textContent =
+      "This is a new address — it will be saved and filled in for you next time.";
+    note.style.color = "var(--accent, #27ae60)";
+  }
+}
+
+async function prefillSavedDetails() {
+  try {
+    const res = await fetch(`${API_BASE}/php/address.php`, {
+      credentials: "include",
+      cache: "no-store",
+    });
+    if (!res.ok) return; // not signed in, or nothing saved
+    const data = await res.json();
+    if (!data.success) return;
+
+    // Never overwrite something the customer has already typed.
+    const fill = (id, value) => {
+      const el = document.getElementById(id);
+      if (el && !el.value.trim() && value) el.value = value;
+    };
+    fill("co-name", data.profile?.full_name);
+    fill("co-email", data.profile?.email);
+
+    const a = data.address;
+    if (!a) return;
+    fill("co-phone", a.phone);
+    fill("co-address", a.street);
+    fill("co-city", a.city);
+    fill("co-province", a.province);
+    fill("co-zip", a.zip_code);
+
+    savedAddress = {
+      street: a.street,
+      city: a.city,
+      province: a.province,
+      zip_code: a.zip_code,
+    };
+
+    const title = [...document.querySelectorAll(".form-section-title")].find(
+      (t) => /shipping/i.test(t.textContent),
+    );
+    if (title && !document.getElementById("saved-address-note")) {
+      const note = document.createElement("p");
+      note.id = "saved-address-note";
+      note.style.cssText = "font-size:13px;margin:-8px 0 14px;";
+      title.insertAdjacentElement("afterend", note);
+    }
+    ["co-address", "co-city", "co-province", "co-zip"].forEach((id) =>
+      document.getElementById(id)?.addEventListener("input", updateSavedAddressNote),
+    );
+    updateSavedAddressNote();
+  } catch (e) {
+    console.warn("Could not load saved checkout details", e);
+  }
+}
+
 // ── Initialise ───────────────────────────────────────────────────────────────
 async function initCheckout() {
   await loadCheckoutSettings();
   renderCart();
+  prefillSavedDetails();
 }
 
 // Event listeners
