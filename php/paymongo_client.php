@@ -17,7 +17,7 @@ class PaymongoException extends Exception {}
  * Low-level authenticated request to the PayMongo API.
  * Auth: HTTP Basic with the secret key as username, empty password.
  */
-function paymongo_request(string $method, string $endpoint, ?array $body = null): array {
+function paymongo_request(string $method, string $endpoint, ?array $body = null, ?int $timeoutSeconds = null): array {
     // NOTE: $endpoint must include its own version prefix, e.g. '/v2/checkout_sessions'.
     // PayMongo's Checkout Sessions API is versioned per-resource (v2 is current/
     // recommended for Checkout Sessions as of 2026), unlike a single global API version.
@@ -33,8 +33,8 @@ function paymongo_request(string $method, string $endpoint, ?array $body = null)
         CURLOPT_CUSTOMREQUEST  => $method,
         CURLOPT_HTTPHEADER     => $headers,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_CONNECTTIMEOUT => 10,
-        CURLOPT_TIMEOUT        => 20,
+        CURLOPT_CONNECTTIMEOUT => $timeoutSeconds !== null ? min(3, $timeoutSeconds) : 10,
+        CURLOPT_TIMEOUT        => $timeoutSeconds ?? 20,
     ]);
 
     if ($body !== null) {
@@ -113,11 +113,11 @@ function paymongo_create_checkout_session(
     return paymongo_request('POST', '/v2/checkout_sessions', $body);
 }
 
-function paymongo_retrieve_checkout_session(string $sessionId): array {
+function paymongo_retrieve_checkout_session(string $sessionId, ?int $timeoutSeconds = null): array {
     // Retrieval lives under /v1 (verified against the live test API: the
     // /v2 path returns "The requested route does not exist"), even though
     // sessions are created through /v2.
-    return paymongo_request('GET', '/v1/checkout_sessions/' . $sessionId);
+    return paymongo_request('GET', '/v1/checkout_sessions/' . $sessionId, null, $timeoutSeconds);
 }
 
 /**

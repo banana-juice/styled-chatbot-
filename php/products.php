@@ -12,6 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 header('Content-Type: application/json');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/stock.php';
+require_once __DIR__ . '/payments.php';
 
 $pdo = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -20,6 +21,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // counts the storefront shows reflect units that are really available.
 if ($method === 'GET') {
     stock_ensure_schema($pdo);
+    payment_reconcile_waiting($pdo); // a paid-but-unnoticed order flips to Paid on any storefront visit
     stock_release_stale_holds($pdo);
 }
 

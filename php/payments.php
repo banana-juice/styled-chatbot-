@@ -213,3 +213,52 @@ function payment_reconcile_orders(PDO $pdo, array $orderIds, int $limit = 5): vo
         }
     }
 }
+
+/**
+ * Look at orders that are waiting for payment and ask PayMongo about them.
+ *
+ * Why this exists: PayMongo's webhook can't reach this site on the free host
+ * (any request without browser cookies gets the host's bot-check page, so the
+ * PHP never runs), which means the shop has to PULL payment status. Calling this
+ * from ordinary storefront traffic means an order flips to Paid within seconds
+ * of the next page view by anyone, not only when its owner reopens it.
+ *
+ * Cheap when nothing is waiting (one indexed query), throttled to one PayMongo
+ * call per order per 15 s, capped per request, and each call has a short timeout
+ * so a slow PayMongo can never stall the page.
+ *
+ * @param callable|null $fetch test hook: fn(string $sessionId): array
+ */
+function payment_reconcile_waiting(PDO $pdo, int $limit = 2, ?callable $fetch = null): int {
+    static $ran = false;
+    if ($ran && $fetch === null) {
+        return 0;
+    }
+    $ran = true;
+
+    $checked = 0;
+    try {
+        stock_ensure_schema($pdo);
+        $q = $pdo->query("
+            SELECT o.order_id
+            FROM orders o
+            JOIN payment_transactions t ON t.transaction_id =
+                (SELECT MAX(transaction_id) FROM payment_transactions WHERE order_id = o.order_id)
+            WHERE o.payment_method <> 'cod'
+              AND o.payment_status = 'processing'
+              AND o.created_at > (NOW() - INTERVAL 3 DAY)
+              AND (t.checked_at IS NULL OR t.checked_at < (NOW() - INTERVAL 15 SECOND))
+            ORDER BY (t.checked_at IS NULL) DESC, t.checked_at ASC
+            LIMIT " . (int) $limit);
+        $quick = $fetch ?? static function (string $sid): array {
+            return paymongo_retrieve_checkout_session($sid, 4);
+        };
+        foreach ($q->fetchAll(PDO::FETCH_COLUMN) as $id) {
+            payment_reconcile_order($pdo, (int) $id, $quick);
+            $checked++;
+        }
+    } catch (Throwable $e) {
+        error_log('payment_reconcile_waiting: ' . $e->getMessage());
+    }
+    return $checked;
+}
