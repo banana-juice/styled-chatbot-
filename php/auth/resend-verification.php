@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 require_once __DIR__ . '/../db.php';
-require_once __DIR__ . '/brevo_email.php';
+require_once __DIR__ . '/../brevo_email.php';
 
 // ── 1. Read input ─────────────────────────────────────────────────────────────
 $input = json_decode(file_get_contents('php://input'), true);
@@ -98,7 +98,8 @@ $htmlBody = "
 $textBody = "Your new Styled verification code is: {$code}. It expires in 15 minutes.";
 
 $sent = sendEmailViaBrevo($email, $full_name, $subject, $htmlBody, $textBody);
-if (!$sent) {
+if (empty($sent['success'])) {
+    error_log("resend-verification: email to {$email} FAILED: " . ($sent['error'] ?? 'unknown error'));
     http_response_code(500);
     echo json_encode(['success' => false, 'error' => 'Could not send email. Please try again.']);
     exit;

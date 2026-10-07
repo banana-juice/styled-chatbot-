@@ -164,5 +164,9 @@ function send_staff_invite_email($toEmail, $toName, $tempPassword, $role)
     $textBody = "Hello {$toName},\n\nYou have been invited as a {$roleDisplay} to the Styled admin dashboard.\n\nYour login credentials:\nEmail: {$toEmail}\nTemporary Password: {$tempPassword}\n\nLogin URL: {$loginUrl}\n\nYou will be asked to change your password after first login.\n\nIf you did not expect this invitation, please ignore this email.";
 
     $subject = "Invitation to join Styled Admin";
-    return sendEmailViaBrevo($toEmail, $toName, $subject, $htmlBody, $textBody);
+    $result = sendEmailViaBrevo($toEmail, $toName, $subject, $htmlBody, $textBody);
+    if (empty($result['success'])) {
+        error_log("send_staff_invite_email: invite to {$toEmail} FAILED: " . ($result['error'] ?? 'unknown error'));
+    }
+    return !empty($result['success']);
 }

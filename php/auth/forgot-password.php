@@ -98,8 +98,8 @@ $htmlBody = "
 $textBody = "Hi {$first_name},\n\nReset your password here (valid for 1 hour):\n{$resetLink}\n\nIf you didn't request this, ignore this email.\n\n— The Styled Team";
 
 $sent = sendEmailViaBrevo($email, $full_name, $subject, $htmlBody, $textBody);
-if (!$sent) {
-    error_log("Brevo forgot-password email failed for {$email}");
+if (empty($sent['success'])) {
+    error_log("forgot-password: email to {$email} FAILED: " . ($sent['error'] ?? 'unknown error'));
     // Do not disclose the error to the client for security reasons.
 }
 
