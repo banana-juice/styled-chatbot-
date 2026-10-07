@@ -11,6 +11,12 @@
     Require all denied
 </FilesMatch>
 
+# Block debug/trace output (webhook trace, OAuth and email debug files).
+# These contain order numbers, payment session ids and error details.
+<FilesMatch "(\.log|_debug\.txt)$">
+    Require all denied
+</FilesMatch>
+
 # Block the .git directory outright (exposes full repo history if reachable)
 RedirectMatch 404 /\.git(/|$)
 
