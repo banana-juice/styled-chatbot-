@@ -56,6 +56,17 @@ $user_id   = $user['user_id'];
 $full_name = $user['full_name'];
 $first_name = explode(' ', $full_name)[0];
 
+// ── 2b. Cooldown: at most one reset email per account per minute ──────────────
+// Without this the endpoint could be looped to mail-bomb a known address and
+// burn the shared email quota that order confirmations also depend on. The
+// reply stays the generic success so it reveals nothing about the account.
+$recent = $pdo->prepare('SELECT COUNT(*) FROM password_resets WHERE user_id = ? AND created_at > (NOW() - INTERVAL 60 SECOND)');
+$recent->execute([$user_id]);
+if ((int) $recent->fetchColumn() > 0) {
+    echo json_encode(['success' => true]);
+    exit;
+}
+
 // ── 3. Invalidate any existing unused tokens for this user ───────────────────
 $pdo->prepare('UPDATE password_resets SET used = 1 WHERE user_id = ? AND used = 0')
     ->execute([$user_id]);
