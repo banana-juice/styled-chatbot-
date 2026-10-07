@@ -23,6 +23,22 @@ define('DB_USER', env_value('DB_USER') ?: 'root');
 define('DB_PASS', env_value('DB_PASS') ?: '');
 define('DB_CHARSET', 'utf8mb4');
 
+/**
+ * A positive whole number from user input, or 0 if it isn't one.
+ * Use this instead of (int): (int) turns the array [1] and the text
+ * "1 OR 1=1" into 1, so a malformed product_id silently became product #1
+ * (a live stress test created a real order that way).
+ */
+function as_pos_int($v): int {
+    if (is_int($v)) {
+        return $v > 0 ? $v : 0;
+    }
+    if (is_string($v) && ctype_digit($v) && strlen($v) <= 18) {
+        return (int) $v;
+    }
+    return 0;
+}
+
 function getPDO(): PDO {
     static $pdo = null;
 

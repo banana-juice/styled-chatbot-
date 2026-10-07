@@ -99,7 +99,7 @@ try {
     // ── POST — add item ───────────────────────────────────────────────────────
     if ($method === 'POST') {
         $body       = get_json_body();
-        $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
+        $product_id = isset($body['product_id']) ? as_pos_int($body['product_id']) : 0;
 
         if ($product_id <= 0) {
             ob_end_clean();
@@ -123,7 +123,7 @@ try {
     // ── DELETE — remove item ──────────────────────────────────────────────────
     if ($method === 'DELETE') {
         $body       = get_json_body();
-        $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
+        $product_id = isset($body['product_id']) ? as_pos_int($body['product_id']) : 0;
 
         if ($product_id <= 0) {
             ob_end_clean();

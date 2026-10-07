@@ -173,7 +173,7 @@ try {
             echo json_encode(['error' => 'Each item must have a whole-number quantity']);
             exit;
         }
-        $product_id = isset($item['product_id']) ? (int) $item['product_id'] : 0;
+        $product_id = isset($item['product_id']) ? as_pos_int($item['product_id']) : 0;
         $qty        = (int) $rawQty;
         $size       = strtoupper(trim((string) ($item['size'] ?? '')));
 

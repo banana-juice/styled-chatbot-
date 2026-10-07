@@ -109,7 +109,7 @@ function styledAmbiguousProductResponse(array $matches): array {
 }
 
 function toolCheckStock(PDO $pdo, array $input): array {
-    $productId   = isset($input['product_id']) ? (int) $input['product_id'] : 0;
+    $productId   = isset($input['product_id']) ? as_pos_int($input['product_id']) : 0;
     $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
     $sizeFilter  = styledNormalizeSize($input['size'] ?? null);
 
@@ -215,7 +215,7 @@ function toolListProducts(PDO $pdo, array $input): array {
 }
 
 function toolGetProductDetails(PDO $pdo, array $input): array {
-    $productId   = isset($input['product_id']) ? (int) $input['product_id'] : 0;
+    $productId   = isset($input['product_id']) ? as_pos_int($input['product_id']) : 0;
     $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
     if ($productId <= 0 && $productName === '') {
         return ['error' => 'Provide either product_id or product_name.'];

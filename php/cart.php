@@ -106,7 +106,7 @@ try {
     // ── POST: add or update an item ───────────────────────────────────────────
     if ($method === 'POST') {
         $body       = get_json_body();
-        $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
+        $product_id = isset($body['product_id']) ? as_pos_int($body['product_id']) : 0;
         $qtyRaw     = array_key_exists('qty', $body) ? $body['qty'] : 1;
 
         if ($product_id <= 0) {
@@ -213,7 +213,7 @@ try {
     // ── DELETE: remove an item ────────────────────────────────────────────────
     if ($method === 'DELETE') {
         $body       = get_json_body();
-        $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
+        $product_id = isset($body['product_id']) ? as_pos_int($body['product_id']) : 0;
         $size       = isset($body['size'])       ? trim(is_string($body['size']) ? $body['size'] : '')        : '';
 
         if ($product_id <= 0) {

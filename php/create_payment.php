@@ -49,7 +49,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $body     = json_decode(file_get_contents('php://input'), true) ?? [];
-$order_id = isset($body['order_id']) ? (int) $body['order_id'] : 0;
+$order_id = isset($body['order_id']) ? as_pos_int($body['order_id']) : 0;
 
 if ($order_id <= 0) {
     ob_end_clean();

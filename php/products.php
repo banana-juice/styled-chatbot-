@@ -44,7 +44,7 @@ if (!empty($_GET['id'])) {
         LEFT JOIN categories c ON c.category_id = p.category_id
         WHERE p.product_id = ? AND p.status = 'active'
     ");
-    $stmt->execute([(int) $_GET['id']]);
+    $stmt->execute([as_pos_int($_GET['id'])]);
     $product = $stmt->fetch();
 
     if (!$product) {
