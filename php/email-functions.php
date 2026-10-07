@@ -103,9 +103,13 @@ function send_order_status_email($pdo, $orderId, $oldStatus, $newStatus, $tracki
     $htmlBody .= "<td width='50%' style='vertical-align:top;'><p style='margin:0 0 6px;font-weight:500;color:#7a6a5a;text-transform:uppercase;font-size:11px;'>Payment Method</p><p style='margin:0;'>{$paymentDisplay}</p></td></tr></table>";
     $htmlBody .= "<a href='{$orderLink}' style='display:inline-block;background:#2c1f14;color:#fff;text-decoration:none;padding:14px 32px;border-radius:4px;font-size:13px;letter-spacing:1px;'>View Your Order</a>";
     $htmlBody .= "</td></tr><tr><td style='background:#faf7f4;padding:24px 40px;text-align:center;border-top:1px solid #f0ebe5;'><p style='margin:0;font-size:12px;color:#a89a8a;'>Questions? Reply to this email or visit our <a href='https://styled.great-site.net/styled/contact.html' style='color:#2c1f14;'>Help Centre</a>.</p><p style='margin:8px 0 0;font-size:11px;color:#c4b8ae;'>© Styled Philippines</p></td></tr></table></td></tr></table>";
-    $textBody = "Hi {$customerName}, ... (simple text version)";
+    $textBody = ''; // empty -> Brevo helper derives a readable text part from the HTML
     
-    return sendEmailViaBrevo($email, $order['full_name'], $subject, $htmlBody, $textBody);
+    $result = sendEmailViaBrevo($email, $order['full_name'], $subject, $htmlBody, $textBody);
+    if (empty($result['success'])) {
+        error_log("send_order_status_email: {$orderNumber} to {$email} FAILED: " . ($result['error'] ?? 'unknown error'));
+    }
+    return $result;
 }
 
 // ============================================

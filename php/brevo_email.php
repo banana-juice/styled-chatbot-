@@ -2,6 +2,13 @@
 require_once __DIR__ . '/config/env.php';
 
 function sendEmailViaBrevo($toEmail, $toName, $subject, $htmlContent, $textContent = '') {
+    // Test hook: a test can set $GLOBALS['__brevo_transport'] = fn(array $payload): array
+    // to capture what would be sent without calling Brevo.
+    if (isset($GLOBALS['__brevo_transport']) && is_callable($GLOBALS['__brevo_transport'])) {
+        return ($GLOBALS['__brevo_transport'])([
+            'to' => $toEmail, 'name' => $toName, 'subject' => $subject, 'html' => $htmlContent,
+        ]);
+    }
     loadEnv();
     // Real key comes from .env (BREVO_API_KEY) — never hardcode it here.
     $apiKey = env_value('BREVO_API_KEY') ?: 'BREVO_API_KEY';
@@ -28,6 +35,9 @@ function sendEmailViaBrevo($toEmail, $toName, $subject, $htmlContent, $textConte
         'content-type: application/json'
     ]);
     curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($data));
+    // Never let a slow mail API hold up checkout or a payment confirmation.
+    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+    curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);

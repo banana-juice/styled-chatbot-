@@ -7,12 +7,12 @@
 // success, not at order-placement time — see checkout.php).
 // ============================================================
 
-// ── Email helper (PHPMailer) ──────────────────────────────────────────────────
-require_once __DIR__ . '/config/smtp.php';
-$_mailerAvailable = file_exists(__DIR__ . '/../vendor/autoload.php');
-if ($_mailerAvailable) {
-    require_once __DIR__ . '/../vendor/autoload.php';
-}
+// ── Email transport ───────────────────────────────────────────────────────────
+// Sent through the Brevo HTTP API, the same channel as the registration and
+// order-status emails. This used to go through Gmail SMTP with an empty
+// password (php/config/smtp.php), so every confirmation failed with
+// "Could not authenticate" and the only trace was a log line.
+require_once __DIR__ . '/brevo_email.php';
 
 /**
  * Send order confirmation email
@@ -28,7 +28,7 @@ function send_order_confirmation(
     float  $grandTotal,
     string $paymentMethod,
     array  $shippingAddress
-): void {
+): bool {
     // Recalculate subtotal from items to ensure consistency
     $recalcSubtotal = 0;
     foreach ($items as $item) {
@@ -160,29 +160,13 @@ function send_order_confirmation(
     </html>
     HTML;
 
-    global $_mailerAvailable;
-    if (!$_mailerAvailable) {
-        error_log('PHPMailer not installed - skipping confirmation email for ' . $orderNumber);
-        return;
+    $subject = "Your Styled Order {$orderNumber} is Confirmed!";
+    $text    = "Hi {$toName}, your order {$orderNumber} has been confirmed. Subtotal: {$subtotalDisplay}, Shipping: {$shippingDisplay}, Total: {$grandDisplay}. Payment: {$paymentDisplay}. Ship to: {$addrLine}.";
+
+    $result = sendEmailViaBrevo($toEmail, $toName, $subject, $html, $text);
+    if (empty($result['success'])) {
+        error_log("send_order_confirmation: email for {$orderNumber} to {$toEmail} FAILED: " . ($result['error'] ?? 'unknown error'));
+        return false;
     }
-
-    $mail = new PHPMailer\PHPMailer\PHPMailer(true);
-    $mail->isSMTP();
-    $mail->Host       = SMTP_HOST;
-    $mail->SMTPAuth   = true;
-    $mail->Username   = SMTP_USER;
-    $mail->Password   = SMTP_PASS;
-    $mail->SMTPSecure = PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port       = SMTP_PORT;
-
-    $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
-    $mail->addAddress($toEmail, $toName);
-    $mail->addReplyTo(SMTP_USER, SMTP_FROM_NAME);
-
-    $mail->isHTML(true);
-    $mail->Subject = "Your Styled Order {$orderNumber} is Confirmed!";
-    $mail->Body    = $html;
-    $mail->AltBody = "Hi {$toName}, your order {$orderNumber} has been confirmed. Subtotal: {$subtotalDisplay}, Shipping: {$shippingDisplay}, Total: {$grandDisplay}. Payment: {$paymentDisplay}. Ship to: {$addrLine}.";
-
-    $mail->send();
+    return true;
 }

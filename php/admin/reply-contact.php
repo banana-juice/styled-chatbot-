@@ -63,37 +63,20 @@ if (!$msg) {
     exit;
 }
 
-// --- Send email using PHPMailer ---
-require_once __DIR__ . '/../../vendor/autoload.php';
+// --- Send email through Brevo (same channel as every other email the shop sends) ---
+require_once __DIR__ . '/../brevo_email.php';
 
-use PHPMailer\PHPMailer\PHPMailer;
-use PHPMailer\PHPMailer\Exception;
-
-$mail = new PHPMailer(true);
-try {
-    $mail->isSMTP();
-    $mail->Host       = SMTP_HOST;
-    $mail->SMTPAuth   = true;
-    $mail->Username   = SMTP_USER;
-    $mail->Password   = SMTP_PASS;
-    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
-    $mail->Port       = SMTP_PORT;
-
-    $mail->setFrom(SMTP_FROM, SMTP_FROM_NAME);
-    $mail->addAddress($msg['email'], $msg['name']);
-
-    $mail->isHTML(true);
-    $mail->Subject = $reply_subject;
-    $mail->Body    = nl2br(htmlspecialchars($reply_body, ENT_QUOTES, 'UTF-8'));
-    $mail->AltBody = $reply_body;
-
-    $mail->send();
-} catch (Exception $e) {
+$sent = sendEmailViaBrevo(
+    $msg['email'],
+    $msg['name'],
+    $reply_subject,
+    nl2br(htmlspecialchars($reply_body, ENT_QUOTES, 'UTF-8')),
+    $reply_body
+);
+if (empty($sent['success'])) {
+    error_log('reply-contact: email to ' . $msg['email'] . ' failed: ' . ($sent['error'] ?? 'unknown'));
     http_response_code(500);
-    echo json_encode([
-        'success' => false,
-        'error'   => 'Email sending failed: ' . $mail->ErrorInfo
-    ]);
+    echo json_encode(['success' => false, 'error' => 'Email sending failed. Please try again.']);
     exit;
 }
 
