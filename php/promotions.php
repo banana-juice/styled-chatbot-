@@ -17,7 +17,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // ── GET: Validate a promo code ────────────────────────────────────────────────
 if ($method === 'GET') {
-    $code     = strtoupper(trim($_GET['code'] ?? ''));
+    $code     = strtoupper(trim(is_string($_GET['code'] ?? null) ? $_GET['code'] : ''));
     $subtotal = (float) ($_GET['subtotal'] ?? 0);
 
     if ($code === '') {

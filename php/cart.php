@@ -214,7 +214,7 @@ try {
     if ($method === 'DELETE') {
         $body       = get_json_body();
         $product_id = isset($body['product_id']) ? (int) $body['product_id'] : 0;
-        $size       = isset($body['size'])       ? trim($body['size'])        : '';
+        $size       = isset($body['size'])       ? trim(is_string($body['size']) ? $body['size'] : '')        : '';
 
         if ($product_id <= 0) {
             http_response_code(400);

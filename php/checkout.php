@@ -69,8 +69,9 @@ try {
 
     $items           = $body['items']            ?? [];
     $shipping_address = $body['shipping_address'] ?? [];
-    $payment_method  = trim($body['payment_method'] ?? '');
-    $promo_code      = trim($body['promo_code']     ?? '');
+    // trim() throws on arrays/objects, so only accept plain strings here.
+    $payment_method  = is_string($body['payment_method'] ?? null) ? trim($body['payment_method']) : '';
+    $promo_code      = is_string($body['promo_code']     ?? null) ? trim($body['promo_code'])     : '';
 
     if (empty($items) || !is_array($items)) {
         ob_end_clean();

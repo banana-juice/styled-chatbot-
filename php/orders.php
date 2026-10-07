@@ -48,7 +48,7 @@ if ($method !== 'GET') {
     $args = [$user_id];
     if (!empty($_GET['id'])) {
         $sql .= ' AND order_number = ?';
-        $args[] = trim($_GET['id']);
+        $args[] = trim(is_string($_GET['id']) ? $_GET['id'] : '');
     }
     $w = $pdo->prepare($sql . ' ORDER BY order_id DESC LIMIT 5');
     $w->execute($args);
@@ -71,7 +71,7 @@ function isoDateTime($ts) {
 
 // Single order
 if (!empty($_GET['id'])) {
-    $order_number = trim($_GET['id']);
+    $order_number = trim(is_string($_GET['id']) ? $_GET['id'] : '');
     $stmt = $pdo->prepare("
         SELECT o.order_id, o.order_number, o.status, o.payment_method,
                o.payment_status,

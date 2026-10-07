@@ -757,3 +757,4 @@
 .addr-msg.ok { color: #3a6b4a; }
 .addr-msg.err { color: #c0392b; }
 @media (max-width: 600px) { .addr-row { flex-direction: column; } }
+.addr-form .btn-primary { align-self: flex-start; min-width: 220px; }

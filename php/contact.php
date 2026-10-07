@@ -25,10 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 require_once __DIR__ . '/db.php';
 
 // Get and sanitize input
-$name    = trim($_POST['name'] ?? '');
-$email   = trim($_POST['email'] ?? '');
-$subject = trim($_POST['subject'] ?? '');
-$message = trim($_POST['message'] ?? '');
+$name    = trim(is_string($_POST['name'] ?? null) ? $_POST['name'] : '');
+$email   = trim(is_string($_POST['email'] ?? null) ? $_POST['email'] : '');
+$subject = trim(is_string($_POST['subject'] ?? null) ? $_POST['subject'] : '');
+$message = trim(is_string($_POST['message'] ?? null) ? $_POST['message'] : '');
 
 // Validate: all fields required
 if (empty($name) || empty($email) || empty($subject) || empty($message)) {
