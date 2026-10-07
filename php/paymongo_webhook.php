@@ -55,6 +55,30 @@ debug_log('Signature header present: ' . ($signatureHeader !== '' ? 'yes' : 'NO'
 if (!paymongo_verify_webhook_signature($rawBody, $signatureHeader)) {
     debug_log('SIGNATURE VERIFICATION FAILED.');
     error_log('PayMongo webhook: signature verification failed');
+
+    // An unverified call can never change an order by itself. But if it names an
+    // order that is waiting for payment, use it as a prompt to ASK PayMongo's API
+    // (server-to-server, with our secret key) whether that order was paid. Only
+    // PayMongo's own answer can mark it paid, so a forged call achieves nothing,
+    // while a mismatched/rotated signing secret no longer delays real payments.
+    try {
+        $peek   = json_decode($rawBody, true);
+        $refNum = $peek['data']['data']['attributes']['reference_number'] ?? null;
+        if (is_string($refNum) && preg_match('/^STY-\d{8}-\d{4}$/', $refNum)) {
+            $pdoPeek = getPDO();
+            $q = $pdoPeek->prepare("SELECT order_id FROM orders
+                WHERE order_number = ? AND payment_method <> 'cod'
+                  AND payment_status IN ('unpaid', 'processing') LIMIT 1");
+            $q->execute([$refNum]);
+            if ($oid = $q->fetchColumn()) {
+                $res = payment_reconcile_order($pdoPeek, (int) $oid); // throttled: once per 10 s per order
+                debug_log('Unverified webhook for ' . $refNum . ' -> asked PayMongo directly, result: ' . var_export($res, true));
+            }
+        }
+    } catch (Throwable $e) {
+        debug_log('Reconcile after failed signature errored: ' . $e->getMessage());
+    }
+
     http_response_code(401);
     echo json_encode(['error' => 'Invalid signature']);
     exit;
