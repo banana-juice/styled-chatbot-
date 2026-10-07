@@ -376,6 +376,98 @@ document.getElementById("os-signout")?.addEventListener("click", handleSignOut);
 
 const tabOrders = document.getElementById("tab-orders");
 const tabWishlist = document.getElementById("tab-wishlist");
+const tabAddress = document.getElementById("tab-address");
+
+// ── My Address: the customer sets up where orders are delivered ─────────────
+function showAddressView() {
+  stopPaymentWatch();
+  setActiveTab(tabAddress);
+  document.getElementById("view-list").style.display = "none";
+  document.getElementById("view-detail").style.display = "none";
+  document.getElementById("view-address").style.display = "block";
+  loadAddressForm();
+}
+
+async function loadAddressForm() {
+  const msg = document.getElementById("addr-msg");
+  try {
+    const res = await fetch("php/address.php", { credentials: "include", cache: "no-store" });
+    if (res.status === 401) { window.location.href = "auth.html"; return; }
+    const d = await res.json();
+    const a = d.address || {};
+    // This is the edit form for the address they already saved. Nothing is
+    // filled in on first use, and checkout never shows these as inputs.
+    document.getElementById("addr-street").value = a.street || "";
+    document.getElementById("addr-city").value = a.city || "";
+    document.getElementById("addr-province").value = a.province || "";
+    document.getElementById("addr-zip").value = a.zip_code || "";
+    document.getElementById("addr-phone").value = a.phone || "";
+    msg.className = "addr-msg";
+    msg.textContent = d.complete ? "" : "Add your delivery address and phone number to check out.";
+  } catch (e) {
+    msg.className = "addr-msg err";
+    msg.textContent = "Could not load your saved address.";
+  }
+}
+
+document.getElementById("address-form")?.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const msg = document.getElementById("addr-msg");
+  const btn = document.getElementById("addr-save");
+  const fields = {
+    street: document.getElementById("addr-street"),
+    city: document.getElementById("addr-city"),
+    province: document.getElementById("addr-province"),
+    zip_code: document.getElementById("addr-zip"),
+    phone: document.getElementById("addr-phone"),
+  };
+  const body = {};
+  let missing = false;
+  for (const [k, el] of Object.entries(fields)) {
+    body[k] = el.value.trim();
+    const bad = body[k] === "";
+    el.classList.toggle("invalid", bad);
+    if (bad) missing = true;
+  }
+  if (missing) {
+    msg.className = "addr-msg err";
+    msg.textContent = "Please fill in every field.";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await fetch("php/address.php", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const d = await res.json();
+    if (!res.ok || !d.success) {
+      msg.className = "addr-msg err";
+      msg.textContent = d.error || "Could not save your address.";
+      if (d.field && fields[d.field]) fields[d.field].classList.add("invalid");
+      return;
+    }
+    msg.className = "addr-msg ok";
+    msg.textContent = "Saved. Checkout will deliver to this address.";
+    // Sent here from checkout? Take them straight back.
+    if (new URLSearchParams(location.search).get("next") === "checkout") {
+      setTimeout(() => (window.location.href = "checkout.html"), 700);
+    }
+  } catch (err) {
+    msg.className = "addr-msg err";
+    msg.textContent = "Network error. Please try again.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+tabAddress?.addEventListener("click", (e) => {
+  e.preventDefault();
+  history.replaceState({}, "", location.pathname + location.search + "#address");
+  showAddressView();
+});
 function setActiveTab(activeEl) {
   document.querySelectorAll(".os-nav-item").forEach((el) => el.classList.remove("active"));
   if (activeEl) activeEl.classList.add("active");
@@ -383,12 +475,15 @@ function setActiveTab(activeEl) {
 tabOrders?.addEventListener("click", (e) => {
   e.preventDefault();
   setActiveTab(tabOrders);
+  document.getElementById("view-address").style.display = "none";
   document.getElementById("view-list").style.display = "block";
   document.getElementById("view-detail").style.display = "none";
 });
 tabWishlist?.addEventListener("click", (e) => {
   e.preventDefault();
   setActiveTab(tabWishlist);
+  document.getElementById("view-address").style.display = "none";
+  document.getElementById("view-list").style.display = "block";
   openWishlistPanel();
 });
 
@@ -396,8 +491,11 @@ window.initOrdersPage = function () {
   initUserInfo();
   renderOrderList();
   setActiveTab(tabOrders);
-  setTimeout(() => setActiveTab(document.getElementById("tab-orders")), 300);
+  setTimeout(() => {
+    if (location.hash !== "#address") setActiveTab(document.getElementById("tab-orders"));
+  }, 300);
   handlePaymentReturnParams();
+  if (location.hash === "#address") showAddressView();
 };
 
 // PayMongo redirects the customer back here after checkout. success_url

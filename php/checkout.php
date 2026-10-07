@@ -79,6 +79,21 @@ try {
         exit;
     }
 
+    // The customer's own saved delivery address (set up under My Address) is used
+    // when asked for; it is read from the database, not trusted from the browser.
+    if (!empty($body['use_saved_address'])) {
+        $sa = $pdo->prepare('SELECT street, city, province, zip_code, phone FROM addresses
+            WHERE user_id = ? ORDER BY is_default DESC, address_id DESC LIMIT 1');
+        $sa->execute([$user_id]);
+        $shipping_address = $sa->fetch(PDO::FETCH_ASSOC) ?: [];
+        if (empty($shipping_address) || empty($shipping_address['phone'])) {
+            ob_end_clean();
+            http_response_code(409);
+            echo json_encode(['error' => 'Please set up your delivery address (with a phone number) first.', 'code' => 'address_required']);
+            exit;
+        }
+    }
+
     $required_address = ['street', 'city', 'province', 'zip_code'];
     foreach ($required_address as $key) {
         if (empty($shipping_address[$key])) {

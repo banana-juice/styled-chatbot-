@@ -744,3 +744,16 @@
     gap: 1rem;
   }
 }
+
+/* ---- MY ADDRESS ---- */
+.addr-intro { max-width: 560px; color: #8c6d57; line-height: 1.7; margin: 0 0 24px; }
+.addr-form { max-width: 560px; display: flex; flex-direction: column; gap: 16px; }
+.addr-form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #8c6d57; flex: 1; }
+.addr-form input { font: inherit; font-size: 15px; letter-spacing: 0; text-transform: none; color: #2c1f14; padding: 13px 14px; border: 1px solid #d9cfc4; background: #fff; border-radius: 2px; }
+.addr-form input:focus { outline: none; border-color: #2c1f14; }
+.addr-form input.invalid { border-color: #c0392b; }
+.addr-row { display: flex; gap: 16px; }
+.addr-msg { min-height: 20px; margin: 0; font-size: 14px; }
+.addr-msg.ok { color: #3a6b4a; }
+.addr-msg.err { color: #c0392b; }
+@media (max-width: 600px) { .addr-row { flex-direction: column; } }

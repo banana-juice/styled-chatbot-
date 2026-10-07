@@ -8,8 +8,8 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/shared.css?v=20261009" />
-    <link rel="stylesheet" href="css/support-widget.css?v=20261009" />
+    <link rel="stylesheet" href="css/shared.css?v=20261011" />
+    <link rel="stylesheet" href="css/support-widget.css?v=20261011" />
     <link rel="stylesheet" href="css/orders.css?v=20260923" />
     <style>
       /* Prevent shared.css overflow:hidden from clipping the sticky sidebar */
@@ -151,6 +151,18 @@
             </svg>
             My Wishlist
           </a>
+          <a class="os-nav-item" href="#address" id="tab-address">
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.7"
+            >
+              <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z" />
+              <circle cx="12" cy="10" r="3" />
+            </svg>
+            My Address
+          </a>
           <a class="os-nav-item" href="index.html">
             <svg
               viewBox="0 0 24 24"
@@ -169,6 +181,41 @@
 
       <!-- MAIN CONTENT -->
       <main class="orders-main">
+        <!-- ── MY ADDRESS VIEW ── -->
+        <div id="view-address" style="display: none">
+          <div class="om-header">
+            <p class="om-eyebrow">Account</p>
+            <h1 class="om-title">My <em>Address</em></h1>
+          </div>
+          <p class="addr-intro">
+            Set up where your orders are delivered. Checkout uses this address
+            automatically, so you only need to come back here if it changes.
+          </p>
+          <form id="address-form" class="addr-form" autocomplete="on" novalidate>
+            <label>Street address
+              <input type="text" id="addr-street" name="street" maxlength="255" required />
+            </label>
+            <div class="addr-row">
+              <label>City
+                <input type="text" id="addr-city" name="city" maxlength="100" required />
+              </label>
+              <label>Province / Region
+                <input type="text" id="addr-province" name="province" maxlength="100" required />
+              </label>
+            </div>
+            <div class="addr-row">
+              <label>ZIP code
+                <input type="text" id="addr-zip" name="zip_code" maxlength="10" required />
+              </label>
+              <label>Phone number
+                <input type="tel" id="addr-phone" name="phone" maxlength="30" required />
+              </label>
+            </div>
+            <p id="addr-msg" class="addr-msg" role="status"></p>
+            <button type="submit" class="btn-primary" id="addr-save">Save address</button>
+          </form>
+        </div>
+
         <!-- ── ORDER LIST VIEW ── -->
         <div id="view-list">
           <div class="om-header">
@@ -355,11 +402,11 @@
 
     <button class="back-to-top" id="back-to-top" title="Back to top">↑</button>
 
-    <script src="js/safe.js?v=20261009"></script>
+    <script src="js/safe.js?v=20261011"></script>
 
-    <script src="js/main.js?v=20261009"></script>
-    <script src="js/support-widget.js?v=20261009"></script>
-    <script src="js/orders.js?v=20261009"></script>
+    <script src="js/main.js?v=20261011"></script>
+    <script src="js/support-widget.js?v=20261011"></script>
+    <script src="js/orders.js?v=20261011"></script>
 
     <!-- ══════════════════════════════════════════════════
      AUTH GUARD + SESSION SIGN-OUT for orders.html

@@ -8,9 +8,9 @@
       href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Jost:wght@300;400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="css/shared.css?v=20261009" />
-    <link rel="stylesheet" href="css/support-widget.css?v=20261009" />
-    <link rel="stylesheet" href="css/checkout.css?v=20261009" />
+    <link rel="stylesheet" href="css/shared.css?v=20261011" />
+    <link rel="stylesheet" href="css/support-widget.css?v=20261011" />
+    <link rel="stylesheet" href="css/checkout.css?v=20261011" />
   </head>
   <body>
     <div class="announcement-bar">
@@ -156,6 +156,10 @@
       </div>
       <div class="checkout-right">
         <div class="checkout-form">
+          <!-- Signed-in customers see their saved delivery details here; the
+               raw inputs below are only shown if they are not signed in. -->
+          <div id="delivery-summary" style="display: none"></div>
+          <div id="address-inputs" style="display: none">
           <p class="form-section-title">Contact Information</p>
           <div class="form-field">
             <input type="text" id="co-name" placeholder="Full Name" />
@@ -186,6 +190,7 @@
               id="co-province"
               placeholder="Province / Region"
             />
+          </div>
           </div>
           <p class="form-section-title">Payment Method</p>
           <div class="payment-tabs">
@@ -348,9 +353,9 @@
       </div>
     </div>
     <button class="back-to-top" id="back-to-top" title="Back to top">↑</button>
-    <script src="js/safe.js?v=20261009"></script>
-    <script src="js/main.js?v=20261009"></script>
-    <script src="js/support-widget.js?v=20261009"></script>
-    <script src="js/checkout.js?v=20261009"></script>
+    <script src="js/safe.js?v=20261011"></script>
+    <script src="js/main.js?v=20261011"></script>
+    <script src="js/support-widget.js?v=20261011"></script>
+    <script src="js/checkout.js?v=20261011"></script>
   </body>
 </html>
