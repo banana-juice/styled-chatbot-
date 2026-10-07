@@ -1035,13 +1035,13 @@ function updateProfileUI() {
         </a>`
       : "";
     dd.innerHTML = `
-      <div class="pd-header">
+      <a class="pd-header pd-header-link" href="orders.html#address" title="Set up or change your delivery address">
         <div class="pd-avatar">${escapeHtml(initials)}</div>
         <div>
           <p class="pd-name">Hello, ${escapeHtml(user.name?.split(" ")[0] || "there")}${adminBadge}</p>
           <p class="pd-email">${escapeHtml(user.email || "")}</p>
         </div>
-      </div>
+      </a>
       <div class="pd-divider"></div>
       ${adminLink}
       <a class="pd-item" href="#" id="pd-wishlist-link">

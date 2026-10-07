@@ -487,6 +487,12 @@ tabWishlist?.addEventListener("click", (e) => {
   openWishlistPanel();
 });
 
+// Clicking "Hello, <name>" in the profile menu while already on this page only
+// changes the #hash, so react to that as well as to the initial load.
+window.addEventListener("hashchange", () => {
+  if (location.hash === "#address") showAddressView();
+});
+
 window.initOrdersPage = function () {
   initUserInfo();
   renderOrderList();
