@@ -87,7 +87,7 @@ $page   = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
 $limit  = min(50, max(1, as_pos_int($_GET['limit'] ?? 8) ?: 8));
 $offset = ($page - 1) * $limit;
 $status = as_text($_GET['status'] ?? '');
-$search = as_text($_GET['search'] ?? '');
+$search = ltrim(as_text($_GET['search'] ?? ''), '# ');   // order numbers are shown as "#STY-…" but stored without the "#"
 $paymentStatus = as_text($_GET['payment_status'] ?? '');   // <-- ADDED
 
 $where  = [];
