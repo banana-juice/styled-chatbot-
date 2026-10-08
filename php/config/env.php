@@ -78,8 +78,5 @@ function loadEnv(): void {
 
         $_ENV[$key]    = $value;
         $_SERVER[$key] = $value;
-        if (function_exists('putenv')) {
-            @putenv("$key=$value"); // best effort only; env_value() doesn't need it
-        }
     }
 }

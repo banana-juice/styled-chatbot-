@@ -41,6 +41,12 @@ if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 $pdo = getPDO();
 
+require_once __DIR__ . '/../ratelimit.php';
+if ($wait = ratelimit_blocked($pdo, ['forgot:ip:' . client_ip() => [10, 3600]])) {
+    ratelimit_fail($wait, 'reset requests');
+}
+ratelimit_hit($pdo, 'forgot:ip:' . client_ip());
+
 // ── 2. Look up user ───────────────────────────────────────────────────────────
 $stmt = $pdo->prepare('SELECT user_id, full_name FROM users WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);

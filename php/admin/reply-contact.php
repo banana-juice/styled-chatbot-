@@ -30,9 +30,10 @@ $user = requireAuth();
 
 // Parse input
 $input = json_decode(file_get_contents('php://input'), true);
-$message_id   = isset($input['message_id'])   ? (int) $input['message_id']   : 0;
-$reply_subject = isset($input['reply_subject']) ? trim($input['reply_subject']) : '';
-$reply_body    = isset($input['reply_body'])    ? trim($input['reply_body'])    : '';
+reject_nested_json($input);
+$message_id   = as_pos_int($input['message_id'] ?? 0);
+$reply_subject = isset($input['reply_subject']) ? trim(as_text($input['reply_subject'])) : '';
+$reply_body    = isset($input['reply_body'])    ? trim(as_text($input['reply_body']))    : '';
 
 // Validate
 if (!$message_id) {

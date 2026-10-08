@@ -27,54 +27,61 @@ if (!defined('STOCK_HOLD_MINUTES')) {
  * DDL implicitly commits in MySQL, so never call this inside a transaction.
  */
 function stock_ensure_schema(PDO $pdo): void {
-    static $done = false;
-    if ($done) {
-        return;
-    }
-    $done = true;
+    require_once __DIR__ . '/schema_flags.php';
+    // Runs once (then costs a single indexed SELECT per request, not a dozen queries).
+    // Rename 'stock_v1' to ship another change to these tables.
+    schema_once($pdo, 'stock_v1', function () use ($pdo) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS stock_adjustments (
+                adjustment_id INT AUTO_INCREMENT PRIMARY KEY,
+                product_id    INT NOT NULL,
+                size          VARCHAR(10) NOT NULL DEFAULT '',
+                delta         INT NOT NULL,
+                qty_before    INT NULL,
+                qty_after     INT NULL,
+                reason        VARCHAR(40) NOT NULL,
+                order_id      INT NULL,
+                user_id       INT NULL,
+                note          VARCHAR(255) NULL,
+                created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_adj_order (order_id),
+                INDEX idx_adj_product (product_id, size),
+                INDEX idx_adj_created (created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
 
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS stock_adjustments (
-            adjustment_id INT AUTO_INCREMENT PRIMARY KEY,
-            product_id    INT NOT NULL,
-            size          VARCHAR(10) NOT NULL DEFAULT '',
-            delta         INT NOT NULL,
-            qty_before    INT NULL,
-            qty_after     INT NULL,
-            reason        VARCHAR(40) NOT NULL,
-            order_id      INT NULL,
-            user_id       INT NULL,
-            note          VARCHAR(255) NULL,
-            created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            INDEX idx_adj_order (order_id),
-            INDEX idx_adj_product (product_id, size),
-            INDEX idx_adj_created (created_at)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
-
-    $wanted = [
-        'orders' => [
-            'failed_at'    => 'DATETIME NULL',
-            'cancelled_at' => 'DATETIME NULL',
-            'updated_at'   => 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
-        ],
-        // when we last asked PayMongo whether this payment went through
-        'payment_transactions' => ['checked_at' => 'DATETIME NULL'],
-        // so a saved address can carry the customer's phone for next time
-        'addresses' => ['phone' => 'VARCHAR(30) NULL'],
-    ];
-    foreach ($wanted as $table => $cols) {
-        $existing = $pdo->query(
-            "SELECT column_name FROM information_schema.columns
-             WHERE table_schema = DATABASE() AND table_name = " . $pdo->quote($table)
-        )->fetchAll(PDO::FETCH_COLUMN);
-        $existing = array_map('strtolower', $existing);
-        foreach ($cols as $col => $ddl) {
-            if (!in_array($col, $existing, true)) {
-                $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$col` $ddl");
+        $wanted = [
+            'orders' => [
+                'failed_at'    => 'DATETIME NULL',
+                'cancelled_at' => 'DATETIME NULL',
+                'updated_at'   => 'TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP',
+            ],
+            // when we last asked PayMongo whether this payment went through
+            'payment_transactions' => ['checked_at' => 'DATETIME NULL'],
+            // so a saved address can carry the customer's phone for next time
+            'addresses' => ['phone' => 'VARCHAR(30) NULL'],
+        ];
+        foreach ($wanted as $table => $cols) {
+            $existing = $pdo->query(
+                "SELECT column_name FROM information_schema.columns
+                 WHERE table_schema = DATABASE() AND table_name = " . $pdo->quote($table)
+            )->fetchAll(PDO::FETCH_COLUMN);
+            $existing = array_map('strtolower', $existing);
+            foreach ($cols as $col => $ddl) {
+                if (in_array($col, $existing, true)) {
+                    continue;
+                }
+                try {
+                    $pdo->exec("ALTER TABLE `$table` ADD COLUMN `$col` $ddl");
+                } catch (PDOException $e) {
+                    // Another request added it first (error 1060): that is fine.
+                    if ((int) ($e->errorInfo[1] ?? 0) !== 1060) {
+                        throw $e;
+                    }
+                }
             }
         }
-    }
+    });
 }
 
 /** Append one row to the stock audit log. */

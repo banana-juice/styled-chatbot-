@@ -28,59 +28,58 @@ if (!defined('REVIEW_REPLY_MAX')) {
  * DDL commits implicitly: never call this inside a transaction.
  */
 function reviews_ensure_schema(PDO $pdo): void {
-    static $done = false;
-    if ($done) {
-        return;
-    }
-    $done = true;
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS product_reviews (
-            review_id  INT AUTO_INCREMENT PRIMARY KEY,
-            product_id INT NOT NULL,
-            user_id    INT NOT NULL,
-            order_id   INT NULL,
-            rating     TINYINT NOT NULL,
-            comment    TEXT NULL,
-            status     ENUM('visible','hidden') NOT NULL DEFAULT 'visible',
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uq_review_user_product (user_id, product_id),
-            KEY idx_review_product (product_id, status)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+    require_once __DIR__ . '/schema_flags.php';
+    // Runs once (then costs one indexed SELECT per request). Rename 'reviews_v2' to ship a schema change.
+    schema_once($pdo, 'reviews_v2', function () use ($pdo) {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS product_reviews (
+                review_id  INT AUTO_INCREMENT PRIMARY KEY,
+                product_id INT NOT NULL,
+                user_id    INT NOT NULL,
+                order_id   INT NULL,
+                rating     TINYINT NOT NULL,
+                comment    TEXT NULL,
+                status     ENUM('visible','hidden') NOT NULL DEFAULT 'visible',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_review_user_product (user_id, product_id),
+                KEY idx_review_product (product_id, status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
 
-    // Columns added after the first release: add them only when missing. Right after
-    // a deploy several requests can arrive at once, all see the column missing, and
-    // all try to add it; the losers get MySQL error 1060 "Duplicate column name",
-    // which just means someone else already did it, so it is ignored.
-    $have = $pdo->query('SHOW COLUMNS FROM product_reviews')->fetchAll(PDO::FETCH_COLUMN);
-    $upgrades = [
-        'size'            => 'ALTER TABLE product_reviews ADD COLUMN size VARCHAR(10) NULL AFTER order_id',
-        'seller_reply'    => 'ALTER TABLE product_reviews ADD COLUMN seller_reply TEXT NULL',
-        'seller_reply_at' => 'ALTER TABLE product_reviews ADD COLUMN seller_reply_at DATETIME NULL',
-    ];
-    foreach ($upgrades as $column => $ddl) {
-        if (in_array($column, $have, true)) {
-            continue;
-        }
-        try {
-            $pdo->exec($ddl);
-        } catch (PDOException $e) {
-            if ((int) ($e->errorInfo[1] ?? 0) !== 1060) {
-                throw $e;
+        // Columns added after the first release: add them only when missing. Right after
+        // a deploy several requests can arrive at once, all see the column missing, and
+        // all try to add it; the losers get MySQL error 1060 "Duplicate column name",
+        // which just means someone else already did it, so it is ignored.
+        $have = $pdo->query('SHOW COLUMNS FROM product_reviews')->fetchAll(PDO::FETCH_COLUMN);
+        $upgrades = [
+            'size'            => 'ALTER TABLE product_reviews ADD COLUMN size VARCHAR(10) NULL AFTER order_id',
+            'seller_reply'    => 'ALTER TABLE product_reviews ADD COLUMN seller_reply TEXT NULL',
+            'seller_reply_at' => 'ALTER TABLE product_reviews ADD COLUMN seller_reply_at DATETIME NULL',
+        ];
+        foreach ($upgrades as $column => $ddl) {
+            if (in_array($column, $have, true)) {
+                continue;
+            }
+            try {
+                $pdo->exec($ddl);
+            } catch (PDOException $e) {
+                if ((int) ($e->errorInfo[1] ?? 0) !== 1060) {
+                    throw $e;
+                }
             }
         }
-    }
 
-    $pdo->exec("
-        CREATE TABLE IF NOT EXISTS product_review_votes (
-            review_id  INT NOT NULL,
-            user_id    INT NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (review_id, user_id),
-            KEY idx_vote_user (user_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    ");
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS product_review_votes (
+                review_id  INT NOT NULL,
+                user_id    INT NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (review_id, user_id),
+                KEY idx_vote_user (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    });
 }
 
 /** "Joseph Gabriel Lontoc" -> "Joseph L." (reviews never expose full names or emails). */

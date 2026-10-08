@@ -20,7 +20,7 @@ $pdo    = getPDO();
 
 // ── GET ───────────────────────────────────────────────────────────────────────
 if ($method === 'GET') {
-    $role = $_GET['role'] ?? '';
+    $role = as_text($_GET['role'] ?? '');
 
     $where  = ["role IN ('admin','staff')"];
     $params = [];
@@ -46,6 +46,7 @@ if ($method === 'GET') {
 // ── POST: Add staff member ────────────────────────────────────────────────────
 if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    reject_nested_json($body);
 
     foreach (['full_name', 'email'] as $f) {
         if (empty($body[$f])) {
@@ -109,7 +110,7 @@ if ($method === 'POST') {
 
 // ── PUT: Update role / status ─────────────────────────────────────────────────
 if ($method === 'PUT') {
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing user id.']);
@@ -117,16 +118,18 @@ if ($method === 'PUT') {
     }
 
     $body   = json_decode(file_get_contents('php://input'), true) ?? [];
+
+    reject_nested_json($body);
     $fields = [];
     $params = [];
 
-    if (isset($body['role']) && in_array($body['role'], ['admin', 'staff', 'customer'])) {
+    if (isset($body['role']) && is_string($body['role']) && in_array($body['role'], ['admin', 'staff', 'customer'], true)) {
         $fields[] = 'role = ?';
         $params[] = $body['role'];
     }
     if (isset($body['is_verified'])) {
         $fields[] = 'is_verified = ?';
-        $params[] = (int) $body['is_verified'];
+        $params[] = as_flag($body['is_verified'], 0);
     }
 
     if (empty($fields)) {
@@ -144,7 +147,7 @@ if ($method === 'PUT') {
 
 // ── DELETE ────────────────────────────────────────────────────────────────────
 if ($method === 'DELETE') {
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing user id.']);

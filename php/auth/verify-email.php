@@ -54,11 +54,26 @@ if (!preg_match('/^\d{6}$/', $code)) {
 
 // ── 2. Look up user by email ──────────────────────────────────────────────────
 $pdo  = getPDO();
+
+// A 6-digit code has only a million possibilities, so wrong guesses are limited.
+require_once __DIR__ . '/../ratelimit.php';
+$ip = client_ip();
+$ek = ratelimit_key($email);
+$verifyLimits = [
+    "verify:pair:$ek:$ip" => [5, 900],
+    "verify:email:$ek"    => [10, 900],
+    "verify:ip:$ip"       => [30, 900],
+];
+if ($wait = ratelimit_blocked($pdo, $verifyLimits)) {
+    ratelimit_fail($wait, 'incorrect codes');
+}
+
 $stmt = $pdo->prepare('SELECT user_id FROM users WHERE email = ? LIMIT 1');
 $stmt->execute([$email]);
 $user = $stmt->fetch();
 
 if (!$user) {
+    ratelimit_hit($pdo, "verify:ip:$ip");
     http_response_code(404);
     echo json_encode(['success' => false, 'error' => 'Account not found.']);
     exit;
@@ -77,6 +92,9 @@ $stmt->execute([$user_id, $code]);
 $row = $stmt->fetch();
 
 if (!$row) {
+    foreach (array_keys($verifyLimits) as $bucket) {
+        ratelimit_hit($pdo, $bucket);
+    }
     http_response_code(422);
     echo json_encode(['success' => false, 'error' => 'Invalid or expired code. Please request a new one.']);
     exit;

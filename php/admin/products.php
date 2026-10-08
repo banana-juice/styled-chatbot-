@@ -15,6 +15,23 @@ require_once __DIR__ . '/_auth.php';
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../stock.php';
 
+/**
+ * The real image type of an uploaded file ('jpg' | 'png' | 'webp'), or null. The file's
+ * CONTENT decides, not its name: a text/HTML/PHP file renamed to .jpg is refused.
+ * Files over 8 MB are refused too.
+ */
+function detect_uploaded_image_ext(string $tmpPath): ?string {
+    if (!is_uploaded_file($tmpPath) || filesize($tmpPath) > 8 * 1024 * 1024) {
+        return null;
+    }
+    $info = @getimagesize($tmpPath);
+    if (!$info) {
+        return null;
+    }
+    $map = [IMAGETYPE_JPEG => 'jpg', IMAGETYPE_PNG => 'png', IMAGETYPE_WEBP => 'webp'];
+    return $map[$info[2]] ?? null;
+}
+
 $user   = requireAuth();
 $method = $_SERVER['REQUEST_METHOD'];
 $pdo    = getPDO();
@@ -39,7 +56,7 @@ if ($method === 'GET') {
 
     // Single product
     if (!empty($_GET['id'])) {
-        $id = (int) $_GET['id'];
+        $id = as_pos_int($_GET['id']);
         if ($id <= 0) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Invalid product id.']);
@@ -80,11 +97,11 @@ if ($method === 'GET') {
     }
 
     // List products (admin sees all, no status filter)
-    $page     = max(1, (int) ($_GET['page']     ?? 1));
-    $limit    = min(50, max(1, (int) ($_GET['limit'] ?? 8)));
+    $page     = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
+    $limit    = min(50, max(1, as_pos_int($_GET['limit'] ?? 8) ?: 8));
     $offset   = ($page - 1) * $limit;
-    $category = $_GET['category'] ?? '';
-    $search   = $_GET['search']   ?? '';
+    $category = as_text($_GET['category'] ?? '');
+    $search   = as_text($_GET['search'] ?? '');
 
     $where  = [];
     $params = [];
@@ -154,15 +171,15 @@ if ($method === 'POST') {
     
     if ($isJson) {
         $body = json_decode(file_get_contents('php://input'), true) ?? [];
-        $name        = trim($body['name']        ?? '');
-        $category_id = (int) ($body['category_id'] ?? 0);
-        $price       = (float) ($body['price']    ?? 0);
-        $description = trim($body['description'] ?? '');
+        $name        = trim(as_text($body['name'] ?? ''));
+        $category_id = as_pos_int($body['category_id'] ?? 0);
+        $price       = is_scalar($body['price'] ?? null) ? (float) $body['price'] : 0;
+        $description = trim(as_text($body['description'] ?? ''));
     } else {
-        $name        = trim($_POST['name']        ?? '');
-        $category_id = (int) ($_POST['category_id'] ?? 0);
+        $name        = trim(as_text($_POST['name'] ?? ''));
+        $category_id = as_pos_int($_POST['category_id'] ?? 0);
         $price       = (float) ($_POST['price']    ?? 0);
-        $description = trim($_POST['description'] ?? '');
+        $description = trim(as_text($_POST['description'] ?? ''));
     }
 
     if (!$name || !$category_id || !$price) {
@@ -206,8 +223,8 @@ if ($method === 'POST') {
         foreach ($_FILES['images']['tmp_name'] as $index => $tmpName) {
             if (empty($tmpName)) continue;
             
-            $ext = strtolower(pathinfo($_FILES['images']['name'][$index], PATHINFO_EXTENSION));
-            if (!in_array($ext, $allowed)) continue;
+            $ext = detect_uploaded_image_ext($tmpName);
+            if ($ext === null) continue;
             
             $filename = uniqid('prod_') . '.' . $ext;
             move_uploaded_file($tmpName, $uploadDir . $filename);
@@ -230,7 +247,7 @@ if ($method === 'POST') {
 if ($method === 'PUT') {
     requireAuth('admin');
     
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing product id.']);
@@ -256,14 +273,14 @@ if ($method === 'PUT') {
         
         // Validate everything first so a bad value can't leave the product
         // half-updated (e.g. name saved, variants rejected).
-        $nameIn  = isset($body['name']) ? trim((string) $body['name']) : null;
+        $nameIn  = isset($body['name']) ? trim(as_text($body['name'])) : null;
         $priceIn = isset($body['price']) ? $body['price'] : null;
         if ($err = validate_product_fields($nameIn, $priceIn)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => $err]);
             exit;
         }
-        if (isset($body['description']) && mb_strlen((string) $body['description']) > 5000) {
+        if (isset($body['description']) && (!is_string($body['description']) || mb_strlen($body['description']) > 5000)) {
             http_response_code(400);
             echo json_encode(['success' => false, 'error' => 'Description must be 5000 characters or fewer.']);
             exit;
@@ -301,11 +318,11 @@ if ($method === 'PUT') {
         }
         if (isset($body['price'])) {
             $fields[] = 'price = ?';
-            $params[] = (float) $body['price'];
+            $params[] = is_scalar($body['price']) ? (float) $body['price'] : 0;
         }
         if (isset($body['category_id'])) {
             $fields[] = 'category_id = ?';
-            $params[] = (int) $body['category_id'];
+            $params[] = as_pos_int($body['category_id']);
         }
         if (!empty($fields)) {
             $params[] = $id;
@@ -372,8 +389,8 @@ if ($method === 'PUT') {
         foreach ($_FILES['new_images']['tmp_name'] as $index => $tmpName) {
             if (empty($tmpName)) continue;
             
-            $ext = strtolower(pathinfo($_FILES['new_images']['name'][$index], PATHINFO_EXTENSION));
-            if (!in_array($ext, $allowed)) continue;
+            $ext = detect_uploaded_image_ext($tmpName);
+            if ($ext === null) continue;
             
             $filename = uniqid('prod_') . '.' . $ext;
             move_uploaded_file($tmpName, $uploadDir . $filename);
@@ -396,7 +413,7 @@ if ($method === 'PUT') {
 if ($method === 'DELETE') {
     requireAuth('admin');
 
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if ($id <= 0) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing or invalid product id.']);

@@ -24,7 +24,7 @@ if ($method === 'GET') {
     // Single message
     if (!empty($_GET['id'])) {
         $stmt = $pdo->prepare("SELECT * FROM contact_messages WHERE message_id = ?");
-        $stmt->execute([(int) $_GET['id']]);
+        $stmt->execute([as_pos_int($_GET['id'])]);
         $msg = $stmt->fetch();
 
         if (!$msg) {
@@ -38,9 +38,9 @@ if ($method === 'GET') {
     }
 
     // List
-    $status = $_GET['status'] ?? '';
-    $page   = max(1, (int) ($_GET['page']  ?? 1));
-    $limit  = min(50, max(1, (int) ($_GET['limit'] ?? 20)));
+    $status = as_text($_GET['status'] ?? '');
+    $page   = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
+    $limit  = min(50, max(1, as_pos_int($_GET['limit'] ?? 20) ?: 20));
     $offset = ($page - 1) * $limit;
 
     $where  = [];
@@ -77,7 +77,7 @@ if ($method === 'GET') {
 
 // ── PUT: Update status ────────────────────────────────────────────────────────
 if ($method === 'PUT') {
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing message id.']);
@@ -86,7 +86,9 @@ if ($method === 'PUT') {
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-    if (!isset($body['status']) || !in_array($body['status'], ['unread', 'read', 'replied'])) {
+    reject_nested_json($body);
+
+    if (!isset($body['status']) || !is_string($body['status']) || !in_array($body['status'], ['unread', 'read', 'replied'], true)) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'status must be unread, read, or replied.']);
         exit;

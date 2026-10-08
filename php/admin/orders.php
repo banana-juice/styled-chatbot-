@@ -31,7 +31,7 @@ if ($method === 'GET') {
         // Make sure the payment status is current before the admin reads it.
         $pending = $pdo->prepare("SELECT order_id FROM orders WHERE order_number = ?
             AND payment_method <> 'cod' AND payment_status IN ('unpaid', 'processing')");
-        $pending->execute([$_GET['id']]);
+        $pending->execute([as_text($_GET['id'])]);
         payment_reconcile_orders($pdo, $pending->fetchAll(PDO::FETCH_COLUMN), 1);
 
         $stmt = $pdo->prepare("
@@ -45,7 +45,7 @@ SELECT o.*,
             LEFT JOIN addresses a ON a.address_id = o.address_id
             WHERE o.order_number = ?
         ");
-        $stmt->execute([$_GET['id']]);
+        $stmt->execute([as_text($_GET['id'])]);
         $order = $stmt->fetch();
 
         if (!$order) {
@@ -83,12 +83,12 @@ SELECT o.*,
 stock_release_stale_holds($pdo);
 
 // List with filters + pagination
-$page   = max(1, (int) ($_GET['page']  ?? 1));
-$limit  = min(50, max(1, (int) ($_GET['limit'] ?? 8)));
+$page   = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
+$limit  = min(50, max(1, as_pos_int($_GET['limit'] ?? 8) ?: 8));
 $offset = ($page - 1) * $limit;
-$status = $_GET['status'] ?? '';
-$search = $_GET['search'] ?? '';
-$paymentStatus = $_GET['payment_status'] ?? '';   // <-- ADDED
+$status = as_text($_GET['status'] ?? '');
+$search = as_text($_GET['search'] ?? '');
+$paymentStatus = as_text($_GET['payment_status'] ?? '');   // <-- ADDED
 
 $where  = [];
 $params = [];
@@ -134,7 +134,7 @@ $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 // sort=desc -> newest first (default; what the dashboard's "recent orders" wants)
 // order_id is the tie-breaker so orders sharing a created_at second keep a
 // stable, repeatable position instead of shuffling between page loads.
-$dir = (strtolower($_GET['sort'] ?? 'desc') === 'asc') ? 'ASC' : 'DESC';
+$dir = (strtolower(as_text($_GET['sort'] ?? 'desc')) === 'asc') ? 'ASC' : 'DESC';
 
 $total = $pdo->prepare("
     SELECT COUNT(*) FROM orders o
@@ -189,6 +189,7 @@ exit;
 // ── PUT: Update status (tracking is ignored, no email for tracking) ─────────────
 if ($method === 'PUT') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    reject_nested_json($body);
 
     if (empty($body['order_id'])) {
         http_response_code(400);
@@ -196,15 +197,20 @@ if ($method === 'PUT') {
         exit;
     }
 
-    $orderId   = (int) $body['order_id'];
-    $newStatus = isset($body['status']) ? strtolower(trim($body['status'])) : null;
+    $orderId   = as_pos_int($body['order_id']);
+    if ($orderId <= 0) {
+        http_response_code(400);
+        echo json_encode(['success' => false, 'error' => 'Invalid order_id.']);
+        exit;
+    }
+    $newStatus = isset($body['status']) ? strtolower(trim(as_text($body['status']))) : null;
 
     // Payment status is NOT editable here. It is set only by the PayMongo
     // webhook (paid / failed) and the customer's own cancel — never by hand,
     // so a "Paid" order always means PayMongo really confirmed the money.
     // (This used to accept payment_status and let any admin mark an order
     // paid, with a "manual override" dropdown in the admin UI.)
-    $requestedPaymentStatus = isset($body['payment_status']) ? strtolower(trim((string) $body['payment_status'])) : '';
+    $requestedPaymentStatus = isset($body['payment_status']) ? strtolower(trim(as_text($body['payment_status']))) : '';
 
     $allowedStatuses = ['pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'];
     if ($newStatus !== null && !in_array($newStatus, $allowedStatuses, true)) {

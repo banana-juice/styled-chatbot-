@@ -1,4 +1,7 @@
 <?php
+// Server-to-server call from PayMongo: it has no browser Origin and is authenticated by
+// its signature below, so the cross-site request guard in db.php must not apply.
+define('SKIP_CSRF_GUARD', true);
 // ============================================================
 // PAYMONGO WEBHOOK — PayMongo calls this URL directly (server-to-server)
 // whenever a checkout session's payment succeeds, fails, or expires.

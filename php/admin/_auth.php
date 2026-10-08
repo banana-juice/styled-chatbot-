@@ -10,7 +10,7 @@
 
 function requireAuth(string $requiredRole = ''): array {
     if (session_status() === PHP_SESSION_NONE) {
-        session_start();
+        require_once __DIR__ . '/../session_boot.php';
     }
 
     $loggedIn = isset($_SESSION['user_id'], $_SESSION['role']);

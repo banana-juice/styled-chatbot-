@@ -28,7 +28,7 @@ if ($method === 'GET') {
             FROM users
             WHERE user_id = ? AND role = 'customer'
         ");
-        $stmt->execute([(int) $_GET['id']]);
+        $stmt->execute([as_pos_int($_GET['id'])]);
         $customer = $stmt->fetch();
 
         if (!$customer) {
@@ -74,10 +74,10 @@ $customer['address'] = $addr->fetch();
     }
 
     // List
-    $page   = max(1, (int) ($_GET['page']  ?? 1));
-    $limit  = min(50, max(1, (int) ($_GET['limit'] ?? 8)));
+    $page   = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
+    $limit  = min(50, max(1, as_pos_int($_GET['limit'] ?? 8) ?: 8));
     $offset = ($page - 1) * $limit;
-    $search = $_GET['search'] ?? '';
+    $search = as_text($_GET['search'] ?? '');
 
     $where  = ["u.role = 'customer'"];
     $params = [];
@@ -121,7 +121,7 @@ $customer['address'] = $addr->fetch();
 
 // ── PUT: Add/update admin notes ───────────────────────────────────────────────
 if ($method === 'PUT') {
-    $id = (int) ($_GET['id'] ?? 0);
+    $id = as_pos_int($_GET['id'] ?? 0);
     if (!$id) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Missing customer id.']);
@@ -130,9 +130,11 @@ if ($method === 'PUT') {
 
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
 
-    if (!isset($body['admin_notes'])) {
+    reject_nested_json($body);
+
+    if (!isset($body['admin_notes']) || !is_string($body['admin_notes']) || mb_strlen($body['admin_notes']) > 5000) {
         http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'admin_notes field required.']);
+        echo json_encode(['success' => false, 'error' => 'admin_notes (text, at most 5000 characters) is required.']);
         exit;
     }
 

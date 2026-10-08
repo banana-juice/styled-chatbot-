@@ -33,7 +33,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // ── GET ──────────────────────────────────────────────────────────────────────
 if ($method === 'GET') {
-    $group = trim($_GET['group'] ?? '');
+    $group = trim(as_text($_GET['group'] ?? ''));
 
     if ($group === '') {
         http_response_code(400);
@@ -64,13 +64,13 @@ if ($method === 'GET') {
 if ($method === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
 
-    if (!is_array($body) || empty($body['group'])) {
+    if (!is_array($body) || empty($body['group']) || !is_string($body['group'])) {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Invalid payload. `group` is required.']);
         exit;
     }
 
-    $group = trim($body['group']);
+    $group = trim(as_text($body['group']));
 
     // Build list of [ key => value ] pairs to upsert
     $pairs = [];
@@ -78,11 +78,16 @@ if ($method === 'POST') {
     if (isset($body['settings']) && is_array($body['settings'])) {
         // Bulk form: { group, settings: { key: value, … } }
         foreach ($body['settings'] as $k => $v) {
-            $pairs[trim($k)] = ($v === null) ? null : (string) $v;
+            if (is_array($v)) {
+                http_response_code(400);
+                echo json_encode(['success' => false, 'error' => 'Setting values must be text.']);
+                exit;
+            }
+            $pairs[trim((string) $k)] = ($v === null) ? null : (string) $v;
         }
-    } elseif (isset($body['key'])) {
+    } elseif (isset($body['key']) && is_string($body['key']) && !is_array($body['value'] ?? null)) {
         // Single pair: { group, key, value }
-        $pairs[trim($body['key'])] = ($body['value'] === null) ? null : (string) $body['value'];
+        $pairs[trim($body['key'])] = (($body['value'] ?? null) === null) ? null : (string) $body['value'];
     } else {
         http_response_code(400);
         echo json_encode(['success' => false, 'error' => 'Provide `key`/`value` or `settings` object.']);

@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-session_start();
+require_once __DIR__ . '/../session_boot.php';
 
 require_once __DIR__ . '/../db.php';
 
@@ -50,6 +50,21 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 
 // ── 3. Look up user — now also fetches is_verified ───────────────────────────
 $pdo  = getPDO();
+
+// Slow down password guessing. Wrong passwords are counted per account+address, per
+// account (any address) and per address (any account); a correct login clears the first.
+require_once __DIR__ . '/../ratelimit.php';
+$ip = client_ip();
+$ek = ratelimit_key($email);
+$loginLimits = [
+    "login:pair:$ek:$ip" => [5, 900],
+    "login:email:$ek"    => [20, 900],
+    "login:ip:$ip"       => [40, 900],
+];
+if ($wait = ratelimit_blocked($pdo, $loginLimits)) {
+    ratelimit_fail($wait, 'failed sign-in attempts');
+}
+
 $stmt = $pdo->prepare(
     'SELECT user_id, full_name, email, password_hash, role, is_verified
      FROM users WHERE email = ? LIMIT 1'
@@ -64,10 +79,15 @@ $dummy_hash = '$2y$10$usesomesillystringfore7hnbRJHxXVLeakoG8K30oukPsA.ztMG';
 $hash       = $user ? $user['password_hash'] : $dummy_hash;
 
 if (!$user || !password_verify($password, $hash)) {
+    foreach (array_keys($loginLimits) as $bucket) {
+        ratelimit_hit($pdo, $bucket);
+    }
     http_response_code(401);
     echo json_encode(['success' => false, 'error' => 'Invalid credentials.']);
     exit;
 }
+
+ratelimit_clear($pdo, "login:pair:$ek:$ip"); // right password: forget the earlier typos
 
 // ── 5. Block login if email not verified ──────────────────────────────────────
 // Admin and staff accounts are created internally and do not require
@@ -97,7 +117,13 @@ if ($remember) {
     // Extend the session cookie lifetime to 30 days (30*24*3600 seconds)
     $sessionName = session_name();
     $sessionId   = session_id();
-    setcookie($sessionName, $sessionId, time() + 30 * 86400, '/', '', false, true);
+    setcookie($sessionName, $sessionId, [
+        'expires'  => time() + 30 * 86400,
+        'path'     => '/',
+        'secure'   => session_request_is_https(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
 }
 
 // ── 8. Return success ─────────────────────────────────────────────────────────

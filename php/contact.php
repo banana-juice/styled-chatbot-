@@ -37,6 +37,13 @@ if (empty($name) || empty($email) || empty($subject) || empty($message)) {
     exit;
 }
 
+// Sensible lengths (the columns are not unlimited, and a 100 KB "message" is not a message)
+if (mb_strlen($name) > 100 || mb_strlen($email) > 150 || mb_strlen($subject) > 200 || mb_strlen($message) > 5000) {
+    http_response_code(400);
+    echo json_encode(['success' => false, 'error' => 'That message is too long. Please shorten it and try again.']);
+    exit;
+}
+
 // Validate: email format
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     http_response_code(400);
@@ -47,6 +54,17 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
 // Insert into contact_messages table
 try {
     $pdo  = getPDO();
+
+    // Flood limit: a few messages per visitor per hour is plenty for a real customer.
+    require_once __DIR__ . '/ratelimit.php';
+    $rules = ['contact:ip:' . client_ip() => [5, 3600], 'contact:email:' . ratelimit_key($email) => [3, 3600]];
+    if ($wait = ratelimit_blocked($pdo, $rules)) {
+        ratelimit_fail($wait, 'messages');
+    }
+    foreach (array_keys($rules) as $bucket) {
+        ratelimit_hit($pdo, $bucket);
+    }
+
     $stmt = $pdo->prepare("
         INSERT INTO contact_messages (name, email, subject, message, status, sent_at)
         VALUES (:name, :email, :subject, :message, 'unread', NOW())

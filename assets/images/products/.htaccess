@@ -1,0 +1,8 @@
+# Uploaded product photos only. Nothing in this folder may ever run as code or be listed.
+<FilesMatch "\.(php|phtml|php[0-9]|phar|pl|py|cgi|sh|asp|aspx|jsp)$">
+    Require all denied
+</FilesMatch>
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Content-Security-Policy "default-src 'none'; img-src 'self'; style-src 'none'; sandbox"
+</IfModule>

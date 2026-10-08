@@ -51,6 +51,95 @@ function as_text($v): string {
     return is_string($v) ? $v : '';
 }
 
+/**
+ * A 0/1 flag from user input: true/1/"1" -> 1, false/0/"0" -> 0. Anything else
+ * (arrays, junk text) gives $default instead of being cast to 1 or 0 by accident.
+ */
+function as_flag($v, int $default = 0): int {
+    if ($v === true || $v === 1 || $v === '1') {
+        return 1;
+    }
+    if ($v === false || $v === 0 || $v === '0') {
+        return 0;
+    }
+    return $default;
+}
+
+/** A whole number >= 0 from user input (int or digit string), or null when it isn't one. */
+function as_nonneg_int($v): ?int {
+    if (is_int($v)) {
+        return $v >= 0 ? $v : null;
+    }
+    if (is_string($v) && ctype_digit($v) && strlen($v) <= 18) {
+        return (int) $v;
+    }
+    return null;
+}
+
+/**
+ * For endpoints whose JSON body is a flat set of fields: refuse a body in which any
+ * field is an array/object (answer 400 and stop). Before this, {"code":["x"]} reached
+ * trim() and crashed with HTTP 500, and {"id":[1]} was quietly treated as id 1.
+ * $allowNested lists the few keys that are legitimately arrays.
+ */
+function reject_nested_json($body, array $allowNested = []): void {
+    if (!is_array($body)) {
+        return;
+    }
+    foreach ($body as $k => $v) {
+        if (is_array($v) && !in_array($k, $allowNested, true)) {
+            http_response_code(400);
+            header('Content-Type: application/json');
+            echo json_encode(['success' => false, 'error' => 'Invalid value for "' . substr((string) $k, 0, 40) . '".']);
+            exit;
+        }
+    }
+}
+
+/**
+ * Refuse state-changing requests that did not come from this site's own pages.
+ *
+ * The API reads JSON from the request body whatever its Content-Type, so a hostile
+ * web page could make a signed-in visitor's browser POST "text/plain" JSON here and
+ * change their address, cart, and so on. A real page always sends an Origin (or
+ * Referer) naming this site, so a foreign one is rejected. A request with neither is
+ * only accepted as JSON, which a browser cannot send cross-site without a CORS
+ * preflight (which this API does not grant). The PayMongo webhook is server-to-server
+ * and is exempt (it authenticates with its own signature).
+ */
+function csrf_guard(): void {
+    if (PHP_SAPI === 'cli' || defined('SKIP_CSRF_GUARD')) {
+        return;
+    }
+    $method = strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET'));
+    if (in_array($method, ['GET', 'HEAD', 'OPTIONS'], true)) {
+        return;
+    }
+    $allowed = [strtolower((string) preg_replace('/:\d+$/', '', (string) ($_SERVER['HTTP_HOST'] ?? '')))];
+    $siteHost = parse_url((string) env_value('SITE_URL', ''), PHP_URL_HOST);
+    if ($siteHost) {
+        $allowed[] = strtolower($siteHost);
+    }
+    $source = $_SERVER['HTTP_ORIGIN'] ?? ($_SERVER['HTTP_REFERER'] ?? '');
+    if ($source !== '') {
+        $host = strtolower((string) parse_url($source, PHP_URL_HOST));
+        $ok   = $host !== '' && in_array($host, $allowed, true);
+    } else {
+        $ok = stripos((string) ($_SERVER['CONTENT_TYPE'] ?? ''), 'application/json') === 0;
+    }
+    if (!$ok) {
+        http_response_code(403);
+        header('Content-Type: application/json');
+        echo json_encode(['success' => false, 'error' => 'Cross-site request blocked.']);
+        exit;
+    }
+}
+
+// Don't advertise the PHP version on every response.
+if (PHP_SAPI !== 'cli') {
+    header_remove('X-Powered-By');
+}
+
 function getPDO(): PDO {
     static $pdo = null;
 
@@ -89,3 +178,6 @@ function getPDO(): PDO {
 
     return $pdo;
 }
+
+// Runs for every endpoint that loads this file (see csrf_guard above).
+csrf_guard();

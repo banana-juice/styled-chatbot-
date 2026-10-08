@@ -13,7 +13,7 @@
 //   • If logged in but not admin  → redirect to index.html
 //   • If admin                    → continue execution
 
-session_start();
+require_once __DIR__ . '/../session_boot.php';
 
 if (empty($_SESSION['user_id'])) {
     header('Location: /styled/auth.html');

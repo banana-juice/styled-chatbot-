@@ -14,7 +14,7 @@ ob_start();
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
 
-session_start();
+require_once __DIR__ . '/session_boot.php';
 require_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json');

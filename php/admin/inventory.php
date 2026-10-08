@@ -24,9 +24,9 @@ stock_ensure_schema($pdo);
 if ($method === 'GET') {
     // Release abandoned-payment holds first so the counts shown are real.
     stock_release_stale_holds($pdo);
-    $category = $_GET['category'] ?? '';
-    $status   = $_GET['status']   ?? '';
-    $search   = $_GET['search']   ?? '';
+    $category = as_text($_GET['category'] ?? '');
+    $status   = as_text($_GET['status'] ?? '');
+    $search   = as_text($_GET['search'] ?? '');
 
     $where  = [];
     $params = [];
@@ -85,6 +85,7 @@ if ($method === 'GET') {
 // ── PUT: Update stock ─────────────────────────────────────────────────────────
 if ($method === 'PUT') {
     $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    reject_nested_json($body);
 
     if (!isset($body['size_id'], $body['stock_qty'])) {
         http_response_code(400);
@@ -105,7 +106,7 @@ if ($method === 'PUT') {
 
     $pdo->beginTransaction();
     $row = $pdo->prepare('SELECT product_id, size, stock_qty FROM product_sizes WHERE size_id = ? FOR UPDATE');
-    $row->execute([(int) $body['size_id']]);
+    $row->execute([as_pos_int($body['size_id'] ?? 0)]);
     $cur = $row->fetch(PDO::FETCH_ASSOC);
     if (!$cur) {
         $pdo->rollBack();
@@ -113,7 +114,7 @@ if ($method === 'PUT') {
         echo json_encode(['success' => false, 'error' => 'Inventory row not found.']);
         exit;
     }
-    $pdo->prepare('UPDATE product_sizes SET stock_qty = ? WHERE size_id = ?')->execute([$newQty, (int) $body['size_id']]);
+    $pdo->prepare('UPDATE product_sizes SET stock_qty = ? WHERE size_id = ?')->execute([$newQty, as_pos_int($body['size_id'] ?? 0)]);
     if ((int) $cur['stock_qty'] !== $newQty) {
         stock_log($pdo, (int) $cur['product_id'], $cur['size'], $newQty - (int) $cur['stock_qty'],
                   (int) $cur['stock_qty'], $newQty, 'admin_adjust', null, $user['user_id'], 'Inventory page edit');

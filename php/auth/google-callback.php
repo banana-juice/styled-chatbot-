@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once __DIR__ . '/../session_boot.php';
 
 // Diagnostics go to the server's error log, not to a file in the web folder.
 function oauth_log($m) {

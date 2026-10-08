@@ -9,7 +9,7 @@ error_reporting(E_ALL);
 if (function_exists('set_time_limit')) {
     @set_time_limit(150);
 }
-session_start();
+require_once __DIR__ . '/session_boot.php';
 header('Content-Type: application/json');
 
 require_once __DIR__ . '/db.php';
@@ -110,7 +110,7 @@ function styledAmbiguousProductResponse(array $matches): array {
 
 function toolCheckStock(PDO $pdo, array $input): array {
     $productId   = isset($input['product_id']) ? as_pos_int($input['product_id']) : 0;
-    $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
+    $productName = isset($input['product_name']) ? trim(as_text($input['product_name'])) : '';
     $sizeFilter  = styledNormalizeSize($input['size'] ?? null);
 
     if ($productId <= 0 && $productName === '') {
@@ -166,7 +166,7 @@ function toolCheckStock(PDO $pdo, array $input): array {
 }
 
 function toolListProducts(PDO $pdo, array $input): array {
-    $category   = isset($input['category']) ? trim((string) $input['category']) : '';
+    $category   = isset($input['category']) ? trim(as_text($input['category'])) : '';
     $sizeFilter = styledNormalizeSize($input['size'] ?? null);
 
     $sql = 'SELECT p.product_id, p.name, p.price, p.sale_price, c.name AS category,
@@ -216,7 +216,7 @@ function toolListProducts(PDO $pdo, array $input): array {
 
 function toolGetProductDetails(PDO $pdo, array $input): array {
     $productId   = isset($input['product_id']) ? as_pos_int($input['product_id']) : 0;
-    $productName = isset($input['product_name']) ? trim((string) $input['product_name']) : '';
+    $productName = isset($input['product_name']) ? trim(as_text($input['product_name'])) : '';
     if ($productId <= 0 && $productName === '') {
         return ['error' => 'Provide either product_id or product_name.'];
     }
@@ -341,7 +341,7 @@ function styledFetchOrderDetail(PDO $pdo, array $order): array {
 }
 
 function toolGetOrderByNumber(PDO $pdo, int $userId, array $input): array {
-    $orderNumber = isset($input['order_number']) ? trim((string) $input['order_number']) : '';
+    $orderNumber = isset($input['order_number']) ? trim(as_text($input['order_number'])) : '';
     if ($orderNumber === '') {
         return ['error' => 'order_number is required.'];
     }
@@ -365,7 +365,7 @@ function toolGetOrderByNumber(PDO $pdo, int $userId, array $input): array {
 }
 
 function toolCheckPromoCode(PDO $pdo, array $input): array {
-    $code = isset($input['code']) ? trim((string) $input['code']) : '';
+    $code = isset($input['code']) ? trim(as_text($input['code'])) : '';
     if ($code === '') {
         return ['error' => 'code is required.'];
     }

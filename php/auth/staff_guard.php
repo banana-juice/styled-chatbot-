@@ -14,7 +14,7 @@
 //   • If admin                             → redirect to admin.html
 //   • If staff                             → continue execution
 
-session_start();
+require_once __DIR__ . '/../session_boot.php';
 
 if (empty($_SESSION['user_id'])) {
     header('Location: /styled/auth.html');

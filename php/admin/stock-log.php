@@ -38,16 +38,16 @@ $where  = [];
 $params = [];
 if (!empty($_GET['product_id'])) {
     $where[]  = 'a.product_id = ?';
-    $params[] = (int) $_GET['product_id'];
+    $params[] = as_pos_int($_GET['product_id']);
 }
 if (!empty($_GET['order_id'])) {
     $where[]  = 'a.order_id = ?';
-    $params[] = (int) $_GET['order_id'];
+    $params[] = as_pos_int($_GET['order_id']);
 }
 $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
-$page   = max(1, (int) ($_GET['page'] ?? 1));
-$limit  = min(100, max(1, (int) ($_GET['limit'] ?? 25)));
+$page   = max(1, as_pos_int($_GET['page'] ?? 1) ?: 1);
+$limit  = min(100, max(1, as_pos_int($_GET['limit'] ?? 25) ?: 25));
 $offset = ($page - 1) * $limit;
 
 $count = $pdo->prepare("SELECT COUNT(*) FROM stock_adjustments a $whereSQL");

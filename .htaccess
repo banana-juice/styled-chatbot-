@@ -37,3 +37,24 @@ RedirectMatch 404 /\.git(/|$)
         Header set Cache-Control "no-cache"
     </FilesMatch>
 </IfModule>
+
+# ============================================
+# Hardening (added by the security audit)
+# ============================================
+
+# Third-party code and internal config are loaded by PHP from the filesystem; there is
+# no reason for a browser to request them (composer metadata, library sources, config).
+RedirectMatch 404 /vendor(/|$)
+RedirectMatch 404 /php/config(/|$)
+<FilesMatch "^(composer\.(json|lock)|package(-lock)?\.json)$">
+    Require all denied
+</FilesMatch>
+
+# Basic browser protections on every response.
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(self)"
+    Header always unset X-Powered-By
+</IfModule>

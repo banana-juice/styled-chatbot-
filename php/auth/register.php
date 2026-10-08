@@ -51,6 +51,12 @@ if (!empty($errors)) {
 
 $pdo = getPDO();
 
+require_once __DIR__ . '/../ratelimit.php';
+if ($wait = ratelimit_blocked($pdo, ['register:ip:' . client_ip() => [15, 3600]])) {
+    ratelimit_fail($wait, 'sign-ups from this connection');
+}
+ratelimit_hit($pdo, 'register:ip:' . client_ip());
+
 // Check duplicate
 $stmt = $pdo->prepare('SELECT user_id FROM users WHERE email = ?');
 $stmt->execute([$email]);
@@ -63,9 +69,19 @@ if ($stmt->fetch()) {
 // Insert user
 $hashed = password_hash($password, PASSWORD_BCRYPT);
 $insert = $pdo->prepare('INSERT INTO users (full_name, email, password_hash, role, is_verified, created_at) VALUES (?, ?, ?, "customer", 0, NOW())');
-if (!$insert->execute([$full_name, $email, $hashed])) {
+try {
+    $insert->execute([$full_name, $email, $hashed]);
+} catch (PDOException $e) {
+    // Two sign-ups for the same email at the same instant both pass the check above;
+    // the unique index lets exactly one win and the other lands here.
+    if ((string) $e->getCode() === '23000') {
+        http_response_code(409);
+        echo json_encode(['success' => false, 'error' => 'Email already exists.']);
+        exit;
+    }
+    error_log('register.php insert failed: ' . $e->getMessage());
     http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'DB insert failed.']);
+    echo json_encode(['success' => false, 'error' => 'Could not create the account. Please try again.']);
     exit;
 }
 $user_id = $pdo->lastInsertId();

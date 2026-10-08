@@ -1,0 +1,4 @@
+# Include-only PHP files: other scripts load them from the filesystem, a browser never needs to.
+<FilesMatch "^(db|schema_flags|ratelimit|session_boot|stock|payments|paymongo_client|brevo_email|email-functions|order-confirmation-email|reviews_lib|_auth|admin_guard|staff_guard)\.php$">
+    Require all denied
+</FilesMatch>
