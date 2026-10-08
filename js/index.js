@@ -315,7 +315,7 @@ async function renderProducts(cat) {
       }
     } else {
       // Accessories: add directly to cart (no size needed)
-      await saveCart({ product_id: productId, size: "", qty: 1 });
+      await saveCart({ product_id: productId, size: "", qty: 1, add: true });
       await getCart();
       if (!_lastCartOk) return; // server refused (e.g. just sold out); toast already shown
       showToast("Added to cart!");

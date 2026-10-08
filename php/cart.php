@@ -173,33 +173,56 @@ try {
             $notice = "Only {$available} of {$productName} (size {$size}) available; quantity adjusted.";
         }
 
-        // Manual upsert: check if row exists, then UPDATE or INSERT
-        // (ON DUPLICATE KEY needs a unique key on (user_id, product_id, size)
-        //  which this table doesn't have, so we do it manually)
-        $check = $pdo->prepare(
-            'SELECT cart_id, qty FROM cart
-             WHERE user_id = :uid AND product_id = :pid AND size = :size'
-        );
-        $check->execute([':uid' => $user_id, ':pid' => $product_id, ':size' => $size]);
-        $existing = $check->fetch();
+        // Check-then-write under a per-customer lock, so rapid double clicks (or
+        // two tabs) can never create duplicate rows or lose an increment, whatever
+        // unique keys the database has.
+        $lockName = 'cart_' . $user_id;
+        $lk = $pdo->prepare('SELECT GET_LOCK(?, 5)');
+        $lk->execute([$lockName]);
+        $gotLock = (int) $lk->fetchColumn() === 1;
+        try {
+            $check = $pdo->prepare(
+                'SELECT cart_id, qty FROM cart
+                 WHERE user_id = :uid AND product_id = :pid AND size = :size'
+            );
+            $check->execute([':uid' => $user_id, ':pid' => $product_id, ':size' => $size]);
+            $existing = $check->fetch();
 
-        if ($existing) {
-            $upd = $pdo->prepare(
-                'UPDATE cart SET qty = :qty, added_at = NOW()
-                 WHERE cart_id = :cid'
-            );
-            $upd->execute([':qty' => $qty, ':cid' => $existing['cart_id']]);
-        } else {
-            $ins = $pdo->prepare(
-                'INSERT INTO cart (user_id, product_id, size, qty, added_at)
-                 VALUES (:uid, :pid, :size, :qty, NOW())'
-            );
-            $ins->execute([
-                ':uid'  => $user_id,
-                ':pid'  => $product_id,
-                ':size' => $size,
-                ':qty'  => $qty,
-            ]);
+            // "add" mode (the Add to Cart buttons): stack onto what is already in the
+            // cart instead of replacing it. The cart page's +/- sends no flag and
+            // keeps "set this quantity" semantics.
+            if ($existing && ($body['add'] ?? false) === true) {
+                $want = (int) $existing['qty'] + $qty;
+                $cap  = min($available, 99);
+                if ($want > $cap) {
+                    $want   = $cap;
+                    $notice = "Only {$available} of {$productName} (size {$size}) available; your cart quantity was adjusted.";
+                }
+                $qty = $want;
+            }
+
+            if ($existing) {
+                $upd = $pdo->prepare(
+                    'UPDATE cart SET qty = :qty, added_at = NOW()
+                     WHERE cart_id = :cid'
+                );
+                $upd->execute([':qty' => $qty, ':cid' => $existing['cart_id']]);
+            } else {
+                $ins = $pdo->prepare(
+                    'INSERT INTO cart (user_id, product_id, size, qty, added_at)
+                     VALUES (:uid, :pid, :size, :qty, NOW())'
+                );
+                $ins->execute([
+                    ':uid'  => $user_id,
+                    ':pid'  => $product_id,
+                    ':size' => $size,
+                    ':qty'  => $qty,
+                ]);
+            }
+        } finally {
+            if ($gotLock) {
+                $pdo->prepare('SELECT RELEASE_LOCK(?)')->execute([$lockName]);
+            }
         }
 
         $response = cart_response($pdo, $user_id);

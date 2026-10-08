@@ -679,9 +679,11 @@ async function addToCart(item) {
     product_id: item.product_id,
     size: item.size || "",
     qty: item.qty || 1,
+    add: true,
   });
   // Refresh local badge with a full GET so the cache is accurate
   await getCart();
+  if (!_lastCartOk) return; // the server refused it; the toast already says why
   showToast("Added to cart!");
 }
 
@@ -1220,8 +1222,59 @@ async function addWishlistItemToCart(product) {
     return;
   }
 
-  await saveCart({ product_id: productId, size: product.size || "", qty: 1 });
+  // Look the product up so we know its real sizes and stock. A wishlist entry
+  // carries no size, so without this a multi-size item was refused by the server
+  // while the customer was still told "Added to cart!".
+  let detail = null;
+  try {
+    const res = await fetch(`${API_BASE}/php/products.php?id=${productId}`, {
+      credentials: "include",
+    });
+    const data = await res.json();
+    if (data && data.success && data.product) detail = data.product;
+  } catch (err) {
+    console.error("addWishlistItemToCart: product lookup failed", err);
+  }
+  if (!detail) {
+    showToast("This product is no longer available.", "error");
+    return;
+  }
+
+  const sizes = Array.isArray(detail.sizes) ? detail.sizes : [];
+  if (sizes.length === 0) {
+    showToast(`${detail.name} is sold out.`, "error");
+    return;
+  }
+  if (sizes.length > 1) {
+    // Several sizes: the customer has to choose one, so open the product view.
+    const price =
+      typeof detail.price === "number" || !String(detail.price).startsWith("₱")
+        ? `₱${parseFloat(detail.price).toFixed(2)}`
+        : detail.price;
+    closeWishlistPanel();
+    openProductModal(
+      {
+        product_id: detail.product_id,
+        name: detail.name,
+        price,
+        img:
+          detail.images?.find((i) => i.is_primary)?.image_url ||
+          detail.images?.[0]?.image_url ||
+          product.img ||
+          "",
+        description: detail.description,
+        sizes: detail.sizes,
+        in_stock: true,
+      },
+      (product.category || "").toLowerCase(),
+    );
+    showToast("Choose a size to add it to your cart.");
+    return;
+  }
+
+  await saveCart({ product_id: productId, size: sizes[0].size, qty: 1, add: true });
   await getCart();
+  if (!_lastCartOk) return; // the server refused it; the toast already says why
   showToast("Added to cart!");
 }
 
@@ -1375,7 +1428,7 @@ function buildProductModal() {
       return;
     }
 
-    await saveCart({ product_id: productId, size, qty: qtyNum });
+    await saveCart({ product_id: productId, size, qty: qtyNum, add: true });
     await getCart();
     if (!_lastCartOk) return; // the server refused it; the toast already says why
 

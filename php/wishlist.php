@@ -64,6 +64,7 @@ function fetch_wishlist_items(PDO $pdo, int $user_id): array {
          JOIN products p ON p.product_id = w.product_id
          LEFT JOIN categories c ON c.category_id = p.category_id
          WHERE w.user_id = :uid
+           AND p.status = "active" AND p.is_active = 1
          ORDER BY w.added_at DESC'
     );
     $stmt->execute([':uid' => $user_id]);
@@ -105,6 +106,16 @@ try {
             ob_end_clean();
             http_response_code(400);
             echo json_encode(['error' => 'product_id is required']);
+            exit;
+        }
+
+        // Only real, currently-sold products can be wishlisted.
+        $exists = $pdo->prepare("SELECT 1 FROM products WHERE product_id = ? AND status = 'active' AND is_active = 1");
+        $exists->execute([$product_id]);
+        if (!$exists->fetchColumn()) {
+            ob_end_clean();
+            http_response_code(404);
+            echo json_encode(['error' => 'Product not found.']);
             exit;
         }
 
