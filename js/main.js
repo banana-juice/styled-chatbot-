@@ -1630,11 +1630,12 @@ function helpfulButtonHtml(r) {
   return `<button type="button" class="rv-helpful${r.i_voted ? " on" : ""}" data-id="${Number(r.review_id)}" aria-pressed="${r.i_voted ? "true" : "false"}">${ICON_THUMB}<span class="rv-helpful-label">Helpful</span><span class="rv-helpful-n" data-n="${n}">${n > 0 ? ` (${n})` : ""}</span></button>`;
 }
 
-function renderReviewList(reviews, append) {
+function renderReviewList(reviews, append, productHasReviews = true) {
   const list = document.getElementById("pm-reviews-list");
   if (!list) return;
   if (!append && !(reviews || []).length) {
-    list.innerHTML = `<p class="rv-note">No reviews match this filter.</p>`;
+    // A product with no reviews at all already says "No reviews yet." in the summary; only a filter that hides everything needs this note.
+    list.innerHTML = productHasReviews ? `<p class="rv-note">No reviews match this filter.</p>` : "";
     const more = document.getElementById("pm-reviews-more");
     if (more) more.style.display = "none";
     return;
@@ -1888,7 +1889,7 @@ async function loadModalReviews(productId, append = false, listOnly = false, _re
     renderReviewSummary(data.summary);
     renderReviewForm(data.viewer);
   }
-  renderReviewList(data.reviews, append);
+  renderReviewList(data.reviews, append, data.summary.count > 0);
   if (_reviewState.focus && !append && !listOnly) {
     _reviewState.focus = false;
     document.getElementById("pm-reviews-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
