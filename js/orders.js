@@ -243,7 +243,7 @@ function openOrderDetail(order, opts = {}) {
   };
   renderTrackingStepper(trackingData);
 
-  renderOrderItems(order.items || []);
+  renderOrderItems(order.items || [], order.status);
   document.getElementById("od-address").innerHTML = escapeHtml(order.shipping?.address || "—").replace(/\n/g, "<br>");
   document.getElementById("od-subtotal").textContent = order.subtotal || "₱0.00";
   document.getElementById("od-shipping").textContent = order.shipping?.cost_display || "FREE";
@@ -333,7 +333,8 @@ function renderRetryPaymentButton(order) {
   paymentSection.appendChild(btn);
 }
 
-function renderOrderItems(items) {
+function renderOrderItems(items, orderStatus) {
+  const canReview = String(orderStatus || "").toLowerCase() === "delivered";
   const list = document.getElementById("od-items-list");
   if (!list) return;
   if (!items.length) {
@@ -351,12 +352,16 @@ function renderOrderItems(items) {
           ${item.size && item.size !== "—" ? `<span>Size: ${escapeHtml(item.size)}</span>` : ""}
           <span>Qty: ${Number(item.qty) || 1}</span>
         </div>
+        ${canReview && Number(item.product_id) > 0 ? `<button type="button" class="od-review-btn" data-pid="${Number(item.product_id)}">Write a review</button>` : ""}
       </div>
       <p class="od-item-price">${escapeHtml(item.price || "₱0.00")}</p>
     </div>
   `,
     )
     .join("");
+  list.querySelectorAll(".od-review-btn").forEach((b) =>
+    b.addEventListener("click", () => openProductById(Number(b.dataset.pid), { focusReviews: true })),
+  );
 }
 
 document.getElementById("back-btn")?.addEventListener("click", () => {

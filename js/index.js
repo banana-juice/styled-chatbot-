@@ -182,6 +182,10 @@ async function renderProducts(cat) {
       const wishData = escapeHtml(
         JSON.stringify({ name: p.name, price: formattedPrice, img: imgSrc, description: p.description }),
       );
+      const reviewCount = Number(p.review_count) || 0;
+      const ratingLine = reviewCount > 0
+        ? `<p class="product-rating"><span class="pr-star">★</span> ${Number(p.avg_rating).toFixed(1)} <span class="pr-count">(${reviewCount})</span></p>`
+        : "";
       return `
        <div class="product-card${soldOut ? " sold-out" : ""}" data-product-id="${Number(p.product_id)}" data-product-name="${safeName}" data-category="${escapeHtml(cat)}" data-sold-out="${soldOut ? "1" : "0"}">
           <div class="product-img-wrap">
@@ -194,6 +198,7 @@ async function renderProducts(cat) {
             <img src="${escapeHtml(imgSrc)}" alt="${safeName}" loading="lazy" onerror="this.src='/styled/assets/images/placeholder.jpg'" />
           </div>
           <p class="product-name">${safeName}</p>
+          ${ratingLine}
           <p class="product-price">${escapeHtml(formattedPrice)}</p>
           <button class="btn-cart" ${soldOut ? "disabled aria-disabled=\"true\"" : ""} data-product-id="${Number(p.product_id)}" data-product-category="${escapeHtml(cat)}" data-product='${cartData}'>
             <svg class="cart-btn-icon" viewBox="0 0 24 24"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" fill="currentColor"/><line x1="3" y1="6" x2="21" y2="6" stroke="white" stroke-width="1.5"/><path d="M16 10a4 4 0 0 1-8 0" fill="none" stroke="white" stroke-width="1.5"/></svg>

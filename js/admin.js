@@ -66,6 +66,7 @@ function navigate(page, btn) {
     settings: "Settings",
     users: "Users",
     contact: "Contact Messages",
+    reviews: "Reviews",
   };
   document.getElementById("page-title").innerHTML = titles[page] || page;
 
@@ -93,6 +94,10 @@ function navigate(page, btn) {
   if (page === "inventory") renderInventory();
   if (page === "users") renderUsers();
   if (page === "contact") renderContactMessages();
+  if (page === "reviews") {
+    reviewsPage = 1;
+    renderReviews();
+  }
 
   initCharts(page);
 }
@@ -173,6 +178,8 @@ function statusBadge(s) {
     unread: "pending",
     read: "delivered",
     replied: "shipped",
+    visible: "active",
+    hidden: "draft",
   };
   const key = (s || "").toLowerCase();
   return `<span class="badge badge-${map[key] || "delivered"}">${escapeHtml(s)}</span>`;
@@ -1405,7 +1412,7 @@ let inventoryStatusFilter = "";
 let inventorySearch = "";
 
 async function renderInventory() {
-  tableLoading("inventory-body", 7);
+  tableLoading("inventory-body", 6);
   const params = new URLSearchParams({
     status: inventoryStatusFilter,
     search: inventorySearch,
@@ -1416,7 +1423,7 @@ async function renderInventory() {
     if (!body) return;
 
     if (!data.success || !data.inventory.length) {
-      body.innerHTML = `<tr><td colspan="7" class="text-muted text-sm" style="padding:16px">No inventory data found. </td></table>`;
+      body.innerHTML = `<tr><td colspan="6" class="text-muted text-sm" style="padding:16px">No inventory data found. </td></tr>`;
     } else {
       body.innerHTML = data.inventory
         .map((item) => {
@@ -1432,7 +1439,6 @@ async function renderInventory() {
           <tr>
             <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(item.product_name)}</td>
             <td class="text-muted">${escapeHtml(item.size) || "—"}</td>
-            <td><code style="font-size:13px;background:var(--beige-100);padding:2px 6px;border-radius:3px">${escapeHtml(item.sku) || "—"}</code></td>
             <td class="text-muted">${escapeHtml(item.category)}</td>
             <td>
               <div class="flex-center gap-8">
@@ -1453,7 +1459,7 @@ async function renderInventory() {
     }
   } catch (err) {
     console.error("[admin]", err);
-    tableError("inventory-body", 7);
+    tableError("inventory-body", 6);
   }
 }
 
@@ -1715,6 +1721,123 @@ async function viewContactMessage(id) {
     if (m.status === "unread") markMessage(id, "read");
   } catch (err) {
     console.error("[admin]", err);
+  }
+}
+
+/* ─────────────────────────────────────────────
+   REVIEWS (moderation)
+───────────────────────────────────────────── */
+let reviewsPage = 1;
+let reviewsFilters = { status: "", rating: "", search: "" };
+let _reviewsSearchTimer = null;
+
+function reviewStars(n) {
+  const r = Math.max(0, Math.min(5, Number(n) || 0));
+  return `<span style="color:#b8893a;letter-spacing:2px;white-space:nowrap">${"★".repeat(r)}${"☆".repeat(5 - r)}</span>`;
+}
+
+async function renderReviews() {
+  tableLoading("reviews-body", 7);
+  const params = new URLSearchParams({
+    page: reviewsPage,
+    limit: 20,
+    status: reviewsFilters.status,
+    rating: reviewsFilters.rating,
+    search: reviewsFilters.search,
+  });
+  try {
+    const data = await fetchJSON(`${API}/reviews.php?${params}`);
+    const body = document.getElementById("reviews-body");
+    if (!body) return;
+
+    if (data.stats) {
+      document.getElementById("rv-stat-visible").textContent = data.stats.visible;
+      document.getElementById("rv-stat-hidden").textContent = data.stats.hidden;
+      document.getElementById("rv-stat-average").textContent = data.stats.visible
+        ? `${Number(data.stats.average).toFixed(1)} ★`
+        : "–";
+    }
+
+    if (!data.success || !data.reviews.length) {
+      body.innerHTML = `<tr><td colspan="7" class="text-muted text-sm" style="padding:16px">No reviews found.</td></tr>`;
+      document.getElementById("reviews-pagination").innerHTML = "";
+      return;
+    }
+    body.innerHTML = data.reviews
+      .map((r) => {
+        const hidden = r.status === "hidden";
+        const id = Number(r.review_id);
+        return `
+        <tr>
+          <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(r.product_name)}</td>
+          <td class="text-muted">${escapeHtml(r.reviewer)}</td>
+          <td>${reviewStars(r.rating)}</td>
+          <td class="text-muted text-sm" style="max-width:280px;white-space:normal" title="${escapeHtml(r.comment || "")}">${r.comment ? escapeHtml(r.comment) : "<em>No comment</em>"}</td>
+          <td>${statusBadge(r.status)}</td>
+          <td class="text-muted">${fmtManila(r.created_at, MANILA_DATE_ONLY)}</td>
+          <td>
+            <div class="flex-center gap-6">
+              <button class="btn btn-outline btn-sm" onclick="setReviewStatus(${id}, '${hidden ? "visible" : "hidden"}')">${hidden ? "Show" : "Hide"}</button>
+              <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deleteReview(${id})">Delete</button>
+            </div>
+          </td>
+        </tr>`;
+      })
+      .join("");
+    renderPagination(
+      "reviews-pagination",
+      data.total,
+      reviewsPage,
+      20,
+      `function(p){reviewsPage=p;renderReviews();}`,
+    );
+  } catch (err) {
+    console.error("[admin]", err);
+    tableError("reviews-body", 7);
+  }
+}
+
+function filterReviews() {
+  clearTimeout(_reviewsSearchTimer);
+  _reviewsSearchTimer = setTimeout(() => {
+    reviewsFilters = {
+      status: document.getElementById("reviews-status")?.value || "",
+      rating: document.getElementById("reviews-rating")?.value || "",
+      search: (document.getElementById("reviews-search")?.value || "").trim(),
+    };
+    reviewsPage = 1;
+    renderReviews();
+  }, 250);
+}
+
+async function setReviewStatus(id, status) {
+  try {
+    await fetchJSON(`${API}/reviews.php`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_id: id, status }),
+    });
+    showToast(status === "hidden" ? "Review hidden." : "Review is visible again.");
+    renderReviews();
+  } catch (err) {
+    console.error("[admin]", err);
+    showToast("Could not update the review.", "error");
+  }
+}
+
+async function deleteReview(id) {
+  if (!window.confirm("Delete this review permanently? This cannot be undone.")) return;
+  try {
+    await fetchJSON(`${API}/reviews.php`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_id: id }),
+    });
+    showToast("Review deleted.");
+    renderReviews();
+  } catch (err) {
+    console.error("[admin]", err);
+    showToast("Could not delete the review.", "error");
   }
 }
 
@@ -2278,7 +2401,6 @@ function renderVariants(sizes) {
           </select>
         </td>
         <td><input type="number" class="form-input" data-variant-idx="${idx}" data-field="stock" min="0" step="1" value="${Number(size.stock_qty) || 0}" style="width:80px"></td>
-        <td><input type="text" class="form-input" data-variant-idx="${idx}" data-field="sku" value="${escapeHtml(size.sku || "")}" placeholder="SKU"></td>
         <td><button class="btn btn-ghost btn-sm" onclick="removeVariant(${idx})">✕</button></td>
       </tr>
     `;
@@ -2332,12 +2454,10 @@ function syncVariantsFromTable() {
   rows.forEach((row) => {
     const sizeSelect = row.querySelector('[data-field="size"]');
     const stockInput = row.querySelector('[data-field="stock"]');
-    const skuInput = row.querySelector('[data-field="sku"]');
     if (sizeSelect && stockInput) {
       variants.push({
         size: sizeSelect.value,
         stock_qty: parseInt(stockInput.value) || 0,
-        sku: skuInput ? skuInput.value : "",
       });
     }
   });
@@ -2346,7 +2466,7 @@ function syncVariantsFromTable() {
 
 function addVariantRow() {
   syncVariantsFromTable();
-  currentVariants.push({ size: "M", stock_qty: 0, sku: "" });
+  currentVariants.push({ size: "M", stock_qty: 0 });
   renderVariants(currentVariants);
 }
 
@@ -2369,12 +2489,10 @@ async function saveVariants() {
   rows.forEach((row) => {
     const sizeSelect = row.querySelector('[data-field="size"]');
     const stockInput = row.querySelector('[data-field="stock"]');
-    const skuInput = row.querySelector('[data-field="sku"]');
     if (sizeSelect && stockInput) {
       variants.push({
         size: sizeSelect.value,
         stock_qty: parseInt(stockInput.value) || 0,
-        sku: skuInput ? skuInput.value : "",
       });
     }
   });
@@ -2450,7 +2568,6 @@ openProductEditor = async function (id) {
       currentVariants = p.sizes.map((s) => ({
         size: s.size,
         stock_qty: s.stock_qty,
-        sku: s.sku || "",
       }));
     } else {
       currentVariants = [];

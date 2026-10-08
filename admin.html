@@ -596,6 +596,20 @@
             </svg>
             Contact Messages
           </button>
+          <button class="nav-item" onclick="navigate('reviews', this)">
+            <svg
+              class="nav-icon"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+            >
+              <polygon
+                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
+              />
+            </svg>
+            Reviews
+          </button>
         </div>
 
         <div class="nav-section">
@@ -1521,7 +1535,6 @@
                       <tr>
                         <th>Size</th>
                         <th>Stock</th>
-                        <th>SKU</th>
                         <th></th>
                       </tr>
                     </thead>
@@ -2090,10 +2103,6 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
                   1
                 </div>
               </div>
-              <div class="stat-card" style="flex: 1; min-width: 120px">
-                <div class="stat-label">SKUs Total</div>
-                <div class="stat-value" style="font-size: 24px">24</div>
-              </div>
             </div>
 
             <div class="card">
@@ -2103,7 +2112,6 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
                     <tr>
                       <th>Product</th>
                       <th>Variant</th>
-                      <th>SKU</th>
                       <th>Category</th>
                       <th>Stock</th>
                       <th>Status</th>
@@ -2515,6 +2523,98 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
             </div>
           </div>
           <!-- /contact messages -->
+
+          <!-- ══════════════════════════════════
+           REVIEWS (moderation)
+      ═══════════════════════════════════ -->
+          <div class="page" id="page-reviews">
+            <div class="page-header">
+              <div class="page-header-left">
+                <h2 class="section-title">Product Reviews</h2>
+                <p class="section-subtitle">
+                  Reviews left by customers who received the product. Hide a
+                  review to remove it from the shop and from the average rating.
+                </p>
+              </div>
+              <div class="page-header-right" style="gap: 10px; flex-wrap: wrap">
+                <input
+                  type="search"
+                  id="reviews-search"
+                  class="form-input"
+                  placeholder="Search product, customer or comment"
+                  style="height: 36px; min-width: 240px"
+                  oninput="filterReviews()"
+                />
+                <select
+                  id="reviews-rating"
+                  class="filter-select"
+                  onchange="filterReviews()"
+                  style="height: 36px"
+                >
+                  <option value="">All ratings</option>
+                  <option value="5">5 stars</option>
+                  <option value="4">4 stars</option>
+                  <option value="3">3 stars</option>
+                  <option value="2">2 stars</option>
+                  <option value="1">1 star</option>
+                </select>
+                <select
+                  id="reviews-status"
+                  class="filter-select"
+                  onchange="filterReviews()"
+                  style="height: 36px"
+                >
+                  <option value="">All reviews</option>
+                  <option value="visible">Visible</option>
+                  <option value="hidden">Hidden</option>
+                </select>
+              </div>
+            </div>
+
+            <div
+              style="display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap"
+            >
+              <div class="stat-card" style="flex: 1; min-width: 120px">
+                <div class="stat-label">Visible</div>
+                <div class="stat-value" style="font-size: 24px" id="rv-stat-visible">–</div>
+              </div>
+              <div class="stat-card" style="flex: 1; min-width: 120px">
+                <div class="stat-label">Hidden</div>
+                <div class="stat-value" style="font-size: 24px; color: var(--gold)" id="rv-stat-hidden">–</div>
+              </div>
+              <div class="stat-card" style="flex: 1; min-width: 120px">
+                <div class="stat-label">Average rating</div>
+                <div class="stat-value" style="font-size: 24px" id="rv-stat-average">–</div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="table-wrap">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Customer</th>
+                      <th>Rating</th>
+                      <th>Comment</th>
+                      <th>Status</th>
+                      <th>Date</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="reviews-body">
+                    <tr>
+                      <td colspan="7" style="text-align: center; color: var(--brown-100); padding: 24px">
+                        Loading…
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pagination" id="reviews-pagination"></div>
+            </div>
+          </div>
+          <!-- /reviews -->
         </div>
         <!-- /page-body -->
       </div>
@@ -2523,7 +2623,7 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
     <!-- /app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/safe.js?v=20261015"></script>
-    <script src="js/admin.js?v=20261015"></script>
+    <script src="js/safe.js?v=20261016"></script>
+    <script src="js/admin.js?v=20261016"></script>
   </body>
 </html>

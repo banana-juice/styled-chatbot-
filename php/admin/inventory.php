@@ -36,8 +36,7 @@ if ($method === 'GET') {
         $params[] = $category;
     }
     if ($search) {
-        $where[]  = '(p.name LIKE ? OR ps.sku LIKE ?)';
-        $params[] = "%$search%";
+        $where[]  = 'p.name LIKE ?';
         $params[] = "%$search%";
     }
     if ($status === 'out') {
@@ -50,9 +49,8 @@ if ($method === 'GET') {
 
     $whereSQL = $where ? 'WHERE ' . implode(' AND ', $where) : '';
 
-    // INCLUDE sku column - it exists in your table!
     $stmt = $pdo->prepare("
-        SELECT ps.size_id, ps.size, ps.stock_qty, ps.sku,
+        SELECT ps.size_id, ps.size, ps.stock_qty,
                p.product_id, p.name AS product_name,
                c.name AS category
         FROM product_sizes ps

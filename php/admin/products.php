@@ -61,7 +61,7 @@ if ($method === 'GET') {
         }
 
         // Sizes + stock
-        $sizes = $pdo->prepare("SELECT * FROM product_sizes WHERE product_id = ?");
+        $sizes = $pdo->prepare("SELECT size_id, product_id, size, stock_qty FROM product_sizes WHERE product_id = ?");
         $sizes->execute([$product['product_id']]);
         $product['sizes'] = $sizes->fetchAll();
 
@@ -284,7 +284,6 @@ if ($method === 'PUT') {
                 }
                 $cleanVariants[$v['size']] = [
                     'qty' => (int) $qtyRaw,
-                    'sku' => isset($v['sku']) ? mb_substr(trim((string) $v['sku']), 0, 100) : null,
                 ];
             }
         }
@@ -323,9 +322,9 @@ if ($method === 'PUT') {
             $oldQty = $old->fetchAll(PDO::FETCH_KEY_PAIR);
 
             $pdo->prepare("DELETE FROM product_sizes WHERE product_id = ?")->execute([$id]);
-            $insert = $pdo->prepare("INSERT INTO product_sizes (product_id, size, stock_qty, sku) VALUES (?, ?, ?, ?)");
+            $insert = $pdo->prepare("INSERT INTO product_sizes (product_id, size, stock_qty) VALUES (?, ?, ?)");
             foreach ($cleanVariants as $size => $v) {
-                $insert->execute([$id, $size, $v['qty'], $v['sku']]);
+                $insert->execute([$id, $size, $v['qty']]);
                 $before = array_key_exists($size, $oldQty) ? (int) $oldQty[$size] : 0;
                 if ($before !== $v['qty']) {
                     stock_log($pdo, $id, $size, $v['qty'] - $before, $before, $v['qty'], 'admin_adjust', null, $user['user_id'], 'Product variants edited');

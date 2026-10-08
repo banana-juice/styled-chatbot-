@@ -1019,7 +1019,7 @@ async function renderInventory() {
     const body = document.getElementById("inventory-body");
     if (!body) return;
     if (!data.success || !data.inventory.length) {
-      body.innerHTML = `</table><td colspan="7" class="text-muted">No inventory data found.</td></tr>`;
+      body.innerHTML = `</table><td colspan="6" class="text-muted">No inventory data found.</td></tr>`;
     } else {
       body.innerHTML = data.inventory
         .map((item) => {
@@ -1035,7 +1035,6 @@ async function renderInventory() {
           <tr>
             <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(item.product_name)}</td>
             <td>${escapeHtml(item.size || "—")}</td>
-            <td><code style="font-size:13px">${escapeHtml(item.sku || "—")}</code></td>
             <td>${escapeHtml(item.category || "—")}</td>
             <td style="color:${isOut ? "var(--red)" : isLow ? "var(--gold)" : "var(--brown-300)"}">${qty}</td>
             <td>${statusBadge(status)}</td>
@@ -1045,7 +1044,7 @@ async function renderInventory() {
         .join("");
     }
   } catch (err) {
-    tableError("inventory-body", 7);
+    tableError("inventory-body", 6);
   }
 }
 

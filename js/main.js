@@ -464,6 +464,8 @@ function normaliseProduct(p) {
     category_name: p.category_name,
     sizes: p.sizes || ["XS", "S", "M", "L", "XL"],
     stock: p.stock || {},
+    avg_rating: p.avg_rating,
+    review_count: p.review_count,
   };
 }
 
@@ -1312,7 +1314,7 @@ function buildProductModal() {
       <div class="pm-right">
         <p class="pm-category" id="pm-category"></p>
         <h2 class="pm-name" id="pm-name"></h2>
-        <div class="pm-stars">★★★★★ <span class="pm-reviews">(99 Reviews)</span></div>
+        <div class="pm-stars" id="pm-stars"></div>
         <p class="pm-price" id="pm-price"></p>
         <p class="pm-desc" id="pm-desc"></p>
         <div class="pm-section-label">SIZE</div>
@@ -1331,10 +1333,20 @@ function buildProductModal() {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.8 1-1a5.5 5.5 0 0 0 0-7.6z"/></svg>
           Add to Wishlist
         </button>
+        <div class="pm-reviews-section" id="pm-reviews-section">
+          <div class="pm-section-label">REVIEWS</div>
+          <div id="pm-reviews-summary"></div>
+          <div id="pm-review-form-wrap"></div>
+          <div id="pm-reviews-list"></div>
+          <button type="button" class="rv-more" id="pm-reviews-more" style="display:none">Show more reviews</button>
+        </div>
       </div>
     </div>
   `;
   document.body.appendChild(modal);
+  document.getElementById("pm-reviews-more").addEventListener("click", () => {
+    if (_reviewState.productId) loadModalReviews(_reviewState.productId, true);
+  });
 
   document
     .getElementById("pm-overlay")
@@ -1442,10 +1454,330 @@ function buildProductModal() {
   });
 }
 
+// ============================================
+// PRODUCT REVIEWS (inside the product modal)
+// Only customers whose order containing the product was Delivered can post
+// (the server enforces it); everyone can read. All text is escaped.
+// ============================================
+let _reviewToken = 0; // a slow answer for a product the modal no longer shows is ignored
+const _reviewState = { productId: 0, page: 1, hasMore: false, viewer: null, editing: false, rating: 0, focus: false };
+
+function starString(avg) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(avg) || 0)));
+  return "★".repeat(n) + "☆".repeat(5 - n);
+}
+
+function reviewCountLabel(count) {
+  return `${count} review${count === 1 ? "" : "s"}`;
+}
+
+function reviewDate(s) {
+  try {
+    const d = typeof parseServerDate === "function" ? parseServerDate(s) : new Date(s);
+    return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Manila" });
+  } catch (_) {
+    return "";
+  }
+}
+
+function renderModalStars(avg, count) {
+  const el = document.getElementById("pm-stars");
+  if (!el) return;
+  const n = Number(count) || 0;
+  el.innerHTML =
+    n > 0
+      ? `${starString(avg)} <span class="pm-reviews">${Number(avg).toFixed(1)} · ${reviewCountLabel(n)}</span>`
+      : `<span class="pm-reviews">No reviews yet</span>`;
+}
+
+/** Keep the product grid's little rating line in step after a review changes. */
+function updateCardRating(productId, avg, count) {
+  document.querySelectorAll(`.product-card[data-product-id="${Number(productId)}"]`).forEach((card) => {
+    let line = card.querySelector(".product-rating");
+    if (!(Number(count) > 0)) {
+      line?.remove();
+      return;
+    }
+    if (!line) {
+      line = document.createElement("p");
+      line.className = "product-rating";
+      card.querySelector(".product-name")?.insertAdjacentElement("afterend", line);
+    }
+    line.innerHTML = `<span class="pr-star">★</span> ${Number(avg).toFixed(1)} <span class="pr-count">(${Number(count)})</span>`;
+  });
+}
+
+function renderReviewSummary(summary) {
+  const el = document.getElementById("pm-reviews-summary");
+  if (!el) return;
+  if (!summary || !(summary.count > 0)) {
+    el.innerHTML = `<p class="rv-note">Be the first to review this product.</p>`;
+    return;
+  }
+  const rows = [5, 4, 3, 2, 1]
+    .map((s) => {
+      const n = Number(summary.distribution?.[s]) || 0;
+      const pct = Math.round((n / summary.count) * 100);
+      return `<div class="rv-bar-row"><span>${s}★</span><div class="rv-bar"><div style="width:${pct}%"></div></div><span>${n}</span></div>`;
+    })
+    .join("");
+  el.innerHTML = `
+    <div class="rv-summary">
+      <div class="rv-avg">
+        <span class="rv-avg-num">${Number(summary.average).toFixed(1)}</span>
+        <span class="rv-avg-stars">${starString(summary.average)}</span>
+        <span class="rv-avg-count">${reviewCountLabel(summary.count)}</span>
+      </div>
+      <div class="rv-bars">${rows}</div>
+    </div>`;
+}
+
+function renderReviewList(reviews, append) {
+  const list = document.getElementById("pm-reviews-list");
+  if (!list) return;
+  const html = (reviews || [])
+    .map(
+      (r) => `
+    <div class="rv-item${r.mine ? " rv-mine" : ""}">
+      <div class="rv-item-head">
+        <span class="rv-item-stars">${starString(r.rating)}</span>
+        <span class="rv-item-name">${escapeHtml(r.reviewer)}${r.mine ? ' <em class="rv-you">You</em>' : ""}</span>
+        <span class="rv-item-date">${escapeHtml(reviewDate(r.created_at))}</span>
+      </div>
+      ${r.comment ? `<p class="rv-item-text">${escapeHtml(r.comment).replace(/\n/g, "<br>")}</p>` : ""}
+    </div>`,
+    )
+    .join("");
+  if (append) list.insertAdjacentHTML("beforeend", html);
+  else list.innerHTML = html;
+  const more = document.getElementById("pm-reviews-more");
+  if (more) more.style.display = _reviewState.hasMore ? "" : "none";
+}
+
+function renderReviewForm(viewer) {
+  const wrap = document.getElementById("pm-review-form-wrap");
+  if (!wrap) return;
+  const mine = viewer?.my_review || null;
+
+  if (!viewer?.logged_in) {
+    wrap.innerHTML = `<p class="rv-note">Sign in to review products you've received.</p>`;
+    return;
+  }
+  if (mine && !_reviewState.editing) {
+    wrap.innerHTML = `
+      <div class="rv-yours">
+        <div class="rv-yours-head"><strong>Your review</strong><span class="rv-item-stars">${starString(mine.rating)}</span></div>
+        ${mine.comment ? `<p class="rv-item-text">${escapeHtml(mine.comment).replace(/\n/g, "<br>")}</p>` : ""}
+        ${mine.status === "hidden" ? `<p class="rv-note">This review is currently hidden by the store.</p>` : ""}
+        <div class="rv-actions">
+          <button type="button" class="rv-link" id="rv-edit">Edit</button>
+          <button type="button" class="rv-link rv-danger" id="rv-delete">Delete</button>
+        </div>
+      </div>`;
+    document.getElementById("rv-edit").addEventListener("click", () => {
+      _reviewState.editing = true;
+      renderReviewForm(_reviewState.viewer);
+    });
+    document.getElementById("rv-delete").addEventListener("click", deleteMyReview);
+    return;
+  }
+  if (!mine && !viewer.can_review) {
+    wrap.innerHTML = `<p class="rv-note">Only customers who have received this product can review it.</p>`;
+    return;
+  }
+
+  _reviewState.rating = mine ? mine.rating : 0;
+  wrap.innerHTML = `
+    <form class="rv-form" id="rv-form" novalidate>
+      <div class="rv-form-title">${mine ? "Edit your review" : "Write a review"}</div>
+      <div class="rv-stars-input" role="radiogroup" aria-label="Your rating">
+        ${[1, 2, 3, 4, 5].map((n) => `<button type="button" class="rv-star" data-v="${n}" role="radio" aria-label="${n} star${n > 1 ? "s" : ""}">★</button>`).join("")}
+      </div>
+      <textarea id="rv-comment" class="rv-textarea" maxlength="1000" rows="3" placeholder="Share your experience (optional)"></textarea>
+      <div class="rv-form-foot">
+        <span class="rv-chars" id="rv-chars">0/1000</span>
+        <span>
+          ${mine ? `<button type="button" class="rv-link" id="rv-cancel">Cancel</button>` : ""}
+          <button type="submit" class="rv-submit" id="rv-submit">${mine ? "Save changes" : "Submit review"}</button>
+        </span>
+      </div>
+      <p class="rv-error" id="rv-error" role="alert" hidden></p>
+    </form>`;
+
+  const stars = [...wrap.querySelectorAll(".rv-star")];
+  const paint = () => stars.forEach((s) => s.classList.toggle("on", Number(s.dataset.v) <= _reviewState.rating));
+  paint();
+  stars.forEach((s) =>
+    s.addEventListener("click", () => {
+      _reviewState.rating = Number(s.dataset.v);
+      paint();
+      document.getElementById("rv-error").hidden = true;
+    }),
+  );
+  const ta = document.getElementById("rv-comment");
+  if (mine) ta.value = mine.comment || "";
+  const chars = document.getElementById("rv-chars");
+  const count = () => (chars.textContent = `${ta.value.length}/1000`);
+  ta.addEventListener("input", count);
+  count();
+  document.getElementById("rv-cancel")?.addEventListener("click", () => {
+    _reviewState.editing = false;
+    renderReviewForm(_reviewState.viewer);
+  });
+  document.getElementById("rv-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    submitReview(!!mine);
+  });
+}
+
+async function submitReview(isEdit) {
+  const err = document.getElementById("rv-error");
+  const btn = document.getElementById("rv-submit");
+  const fail = (msg) => {
+    err.textContent = msg;
+    err.hidden = false;
+  };
+  if (!(_reviewState.rating >= 1 && _reviewState.rating <= 5)) {
+    fail("Please choose a rating from 1 to 5 stars.");
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const res = await fetch(`${API_BASE}/php/reviews.php`, {
+      method: isEdit ? "PUT" : "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_id: _reviewState.productId,
+        rating: _reviewState.rating,
+        comment: document.getElementById("rv-comment").value,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      fail(data.error || "Could not save your review. Please try again.");
+      btn.disabled = false;
+      return;
+    }
+    showToast(isEdit ? "Review updated." : "Thanks for your review!");
+    _reviewState.editing = false;
+    await loadModalReviews(_reviewState.productId);
+  } catch (e) {
+    fail("Network error. Please try again.");
+    btn.disabled = false;
+  }
+}
+
+async function deleteMyReview() {
+  if (!window.confirm("Delete your review?")) return;
+  try {
+    const res = await fetch(`${API_BASE}/php/reviews.php`, {
+      method: "DELETE",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: _reviewState.productId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      showToast(data.error || "Could not delete your review.");
+      return;
+    }
+    showToast("Review deleted.");
+    _reviewState.editing = false;
+    await loadModalReviews(_reviewState.productId);
+  } catch (_) {
+    showToast("Network error. Please try again.");
+  }
+}
+
+async function loadModalReviews(productId, append = false) {
+  const token = _reviewToken;
+  const page = append ? _reviewState.page + 1 : 1;
+  let data;
+  try {
+    const res = await fetch(`${API_BASE}/php/reviews.php?product_id=${productId}&page=${page}&limit=5`, {
+      credentials: "include",
+    });
+    data = await res.json();
+  } catch (_) {
+    return;
+  }
+  if (token !== _reviewToken || !data || !data.success) return;
+  _reviewState.page = page;
+  _reviewState.hasMore = !!data.has_more;
+  _reviewState.viewer = data.viewer;
+  renderModalStars(data.summary.average, data.summary.count);
+  updateCardRating(productId, data.summary.average, data.summary.count);
+  if (!append) {
+    renderReviewSummary(data.summary);
+    renderReviewForm(data.viewer);
+  }
+  renderReviewList(data.reviews, append);
+  if (_reviewState.focus && !append) {
+    _reviewState.focus = false;
+    document.getElementById("pm-reviews-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+/** Called whenever the product modal opens: reset the reviews area and load it. */
+function initModalReviews(product, opts = {}) {
+  _reviewToken++;
+  const sec = document.getElementById("pm-reviews-section");
+  const pid = Number(product.product_id) || 0;
+  Object.assign(_reviewState, { productId: pid, page: 1, hasMore: false, viewer: null, editing: false, rating: 0, focus: !!opts.focusReviews });
+  if (!sec) return;
+  if (!pid) {
+    sec.style.display = "none";
+    renderModalStars(0, 0);
+    return;
+  }
+  sec.style.display = "";
+  if (product.review_count !== undefined) renderModalStars(product.avg_rating, product.review_count);
+  else renderModalStars(0, 0);
+  document.getElementById("pm-reviews-summary").innerHTML = "";
+  document.getElementById("pm-review-form-wrap").innerHTML = "";
+  document.getElementById("pm-reviews-list").innerHTML = `<p class="rv-note">Loading reviews…</p>`;
+  const more = document.getElementById("pm-reviews-more");
+  if (more) more.style.display = "none";
+  loadModalReviews(pid);
+}
+
+/** Open the product modal for a product id (used by "Write a review" on My Orders). */
+async function openProductById(productId, opts = {}) {
+  try {
+    const res = await fetch(`${API_BASE}/php/products.php?id=${Number(productId)}`, { credentials: "include" });
+    const data = await res.json();
+    if (!data || !data.success || !data.product) {
+      showToast("This product is no longer available.");
+      return;
+    }
+    const d = data.product;
+    const price = String(d.price).startsWith("₱") ? d.price : `₱${parseFloat(d.price).toFixed(2)}`;
+    const sizes = Array.isArray(d.sizes) ? d.sizes : [];
+    openProductModal(
+      {
+        product_id: d.product_id,
+        name: d.name,
+        price,
+        img: d.images?.find((i) => i.is_primary)?.image_url || d.images?.[0]?.image_url || "",
+        description: d.description,
+        sizes: d.sizes,
+        in_stock: sizes.length > 0,
+        avg_rating: d.avg_rating,
+        review_count: d.review_count,
+      },
+      String(d.category_name || "").toLowerCase(),
+      opts,
+    );
+  } catch (_) {
+    showToast("Could not load the product. Please try again.");
+  }
+}
+
 // Categories that have no clothing size (one-size-fits-all / accessories)
 const NO_SIZE_CATEGORIES = new Set(["accessories"]);
 
-function openProductModal(product, categoryKey) {
+function openProductModal(product, categoryKey, opts = {}) {
   buildProductModal();
   const catData = CATEGORIES[categoryKey] || {};
 
@@ -1517,6 +1849,7 @@ function openProductModal(product, categoryKey) {
 
   document.getElementById("product-modal").classList.add("open");
   document.body.style.overflow = "hidden";
+  initModalReviews(product, opts);
 }
 
 function closeProductModal() {

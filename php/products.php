@@ -13,6 +13,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/stock.php';
 require_once __DIR__ . '/payments.php';
+require_once __DIR__ . '/reviews_lib.php';
 
 $pdo = getPDO();
 $method = $_SERVER['REQUEST_METHOD'];
@@ -21,6 +22,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 // counts the storefront shows reflect units that are really available.
 if ($method === 'GET') {
     stock_ensure_schema($pdo);
+    reviews_ensure_schema($pdo);
     payment_reconcile_waiting($pdo); // a paid-but-unnoticed order flips to Paid on any storefront visit
     stock_release_stale_holds($pdo);
 }
@@ -68,6 +70,10 @@ if (!empty($_GET['id'])) {
         $img['image_url'] = fixImageUrl($img['image_url']);
     }
     $product['images'] = $images;
+
+    $rv = reviews_summary($pdo, (int) $product['product_id']);
+    $product['avg_rating']   = $rv['average'];
+    $product['review_count'] = $rv['count'];
 
     // Get available sizes with stock
     $sizeStmt = $pdo->prepare("
@@ -133,7 +139,9 @@ $stmt = $pdo->prepare("
                 WHERE pi.product_id = p.product_id AND pi.is_primary = 1 LIMIT 1),
                'assets/images/placeholder.jpg'
            ) AS primary_image,
-           COALESCE(SUM(ps.stock_qty), 0) AS stock
+           COALESCE(SUM(ps.stock_qty), 0) AS stock,
+           (SELECT ROUND(AVG(r.rating), 1) FROM product_reviews r WHERE r.product_id = p.product_id AND r.status = 'visible') AS avg_rating,
+           (SELECT COUNT(*) FROM product_reviews r WHERE r.product_id = p.product_id AND r.status = 'visible') AS review_count
     FROM products p
     LEFT JOIN categories c ON c.category_id = p.category_id
     LEFT JOIN product_sizes ps ON ps.product_id = p.product_id
@@ -148,6 +156,8 @@ $products = $stmt->fetchAll();
 // Fix image URLs for list
 foreach ($products as &$product) {
     $product['primary_image'] = fixImageUrl($product['primary_image']);
+    $product['avg_rating']    = $product['avg_rating'] !== null ? (float) $product['avg_rating'] : 0;
+    $product['review_count']  = (int) $product['review_count'];
 }
 
 echo json_encode([
