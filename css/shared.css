@@ -1401,6 +1401,11 @@ a.pd-header-link:hover .pd-name {
   margin: 0;
 }
 
+.rv-note a {
+  color: var(--brown-mid);
+  text-decoration: underline;
+}
+
 .rv-summary {
   display: flex;
   gap: 22px;

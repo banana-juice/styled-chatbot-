@@ -1,13 +1,9 @@
 <?php
 session_start();
 
-// TEMPORARY DEBUG — remove before final submission
-define('OAUTH_DEBUG', true);
+// Diagnostics go to the server's error log, not to a file in the web folder.
 function oauth_log($m) {
-    if (defined('OAUTH_DEBUG') && OAUTH_DEBUG) {
-        file_put_contents(__DIR__ . '/oauth_debug.txt',
-            date('c') . ' ' . $m . "\n", FILE_APPEND);
-    }
+    error_log('google-callback: ' . $m);
 }
 
 require_once __DIR__ . '/../config/google_oauth.php';

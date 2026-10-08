@@ -23,15 +23,11 @@ require_once __DIR__ . '/paymongo_client.php';
 require_once __DIR__ . '/payments.php';
 require_once __DIR__ . '/order-confirmation-email.php';
 
-// ── TEMPORARY DEBUG LOGGING ─────────────────────────────────────────────
-// InfinityFree's free tier has no error log viewer, so this writes a plain
-// text trace of every webhook call to a file you can open directly in
-// File Manager. DELETE THIS BLOCK (and the debug_log() calls below, and
-// the log file itself) once the webhook is confirmed working — it's not
-// meant to stay in production.
+// ── Diagnostics ─────────────────────────────────────────────────────────
+// Trace lines go to the server's error log (never to a file inside the web
+// folder, which is what the old temporary debug log did).
 function debug_log(string $msg): void {
-    $line = '[' . date('Y-m-d H:i:s') . '] ' . $msg . "\n";
-    file_put_contents(__DIR__ . '/paymongo_webhook_debug.log', $line, FILE_APPEND);
+    error_log('paymongo_webhook: ' . $msg);
 }
 debug_log('--- webhook invoked ---');
 // ─────────────────────────────────────────────────────────────────────────

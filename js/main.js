@@ -1511,7 +1511,7 @@ function renderReviewSummary(summary) {
   const el = document.getElementById("pm-reviews-summary");
   if (!el) return;
   if (!summary || !(summary.count > 0)) {
-    el.innerHTML = `<p class="rv-note">Be the first to review this product.</p>`;
+    el.innerHTML = `<p class="rv-note">No reviews yet.</p>`;
     return;
   }
   const rows = [5, 4, 3, 2, 1]
@@ -1560,7 +1560,7 @@ function renderReviewForm(viewer) {
   const mine = viewer?.my_review || null;
 
   if (!viewer?.logged_in) {
-    wrap.innerHTML = `<p class="rv-note">Sign in to review products you've received.</p>`;
+    wrap.innerHTML = `<p class="rv-note"><a href="auth.html">Sign in</a> to review products you've received. You can write a review after your order is delivered.</p>`;
     return;
   }
   if (mine && !_reviewState.editing) {
@@ -1582,7 +1582,9 @@ function renderReviewForm(viewer) {
     return;
   }
   if (!mine && !viewer.can_review) {
-    wrap.innerHTML = `<p class="rv-note">Only customers who have received this product can review it.</p>`;
+    wrap.innerHTML = viewer.has_open_order
+      ? `<p class="rv-note">Your order with this item hasn't been delivered yet. Once it arrives, come back here or open it in <a href="orders.html">My Orders</a> and tap <strong>Write a review</strong>.</p>`
+      : `<p class="rv-note">Reviews are written by customers who have received this product. After your order is delivered, open it in <a href="orders.html">My Orders</a> and tap <strong>Write a review</strong>.</p>`;
     return;
   }
 

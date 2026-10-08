@@ -61,7 +61,24 @@ if ($method === 'GET') {
     ");
     $stmt->execute($params);
 
-    echo json_encode(['success' => true, 'inventory' => $stmt->fetchAll()]);
+    // Totals across ALL variants (not just the filtered rows) for the stat cards.
+    $t = $pdo->query("
+        SELECT SUM(stock_qty > 5)                    AS in_stock,
+               SUM(stock_qty > 0 AND stock_qty <= 5) AS low_stock,
+               SUM(stock_qty = 0)                    AS out_of_stock,
+               COUNT(*)                              AS total
+        FROM product_sizes")->fetch();
+
+    echo json_encode([
+        'success'   => true,
+        'inventory' => $stmt->fetchAll(),
+        'stats'     => [
+            'in_stock'     => (int) $t['in_stock'],
+            'low_stock'    => (int) $t['low_stock'],
+            'out_of_stock' => (int) $t['out_of_stock'],
+            'total'        => (int) $t['total'],
+        ],
+    ]);
     exit;
 }
 

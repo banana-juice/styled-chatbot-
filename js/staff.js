@@ -1016,6 +1016,11 @@ async function renderInventory() {
   if (inventoryStockFilter) params.set("status", inventoryStockFilter);
   try {
     const data = await fetchJSON(`${API}/inventory.php?${params}`);
+    if (data.stats) {
+      document.getElementById("inv-stat-in").textContent = data.stats.in_stock;
+      document.getElementById("inv-stat-low").textContent = data.stats.low_stock;
+      document.getElementById("inv-stat-out").textContent = data.stats.out_of_stock;
+    }
     const body = document.getElementById("inventory-body");
     if (!body) return;
     if (!data.success || !data.inventory.length) {

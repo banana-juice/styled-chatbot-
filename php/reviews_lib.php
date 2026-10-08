@@ -125,3 +125,16 @@ function reviews_eligible_order(PDO $pdo, int $userId, int $productId): int {
     $stmt->execute([$userId, $productId]);
     return (int) $stmt->fetchColumn();
 }
+
+/** True when the customer has an order with this product that is on its way (not delivered, not cancelled/refunded). */
+function reviews_has_open_order(PDO $pdo, int $userId, int $productId): bool {
+    $stmt = $pdo->prepare("
+        SELECT 1
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.order_id
+        WHERE o.user_id = ? AND oi.product_id = ?
+          AND o.status NOT IN ('delivered', 'cancelled', 'refunded')
+        LIMIT 1");
+    $stmt->execute([$userId, $productId]);
+    return (bool) $stmt->fetchColumn();
+}

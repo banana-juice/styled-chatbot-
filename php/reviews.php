@@ -105,6 +105,7 @@ try {
         }
 
         $eligible = $userId ? reviews_eligible_order($pdo, $userId, $productId) > 0 : false;
+        $openOrder = ($userId && !$eligible && !$mine) ? reviews_has_open_order($pdo, $userId, $productId) : false;
         review_out(200, [
             'success'      => true,
             'summary'      => $summary,
@@ -115,6 +116,7 @@ try {
                 'logged_in'  => (bool) $userId,
                 'can_review' => $eligible && !$mine,
                 'purchased'  => $eligible,
+                'has_open_order' => $openOrder,
                 'my_review'  => $mine,
             ],
         ]);
