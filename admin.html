@@ -182,6 +182,51 @@
       </div>
     </div>
 
+    <!-- Reply to a Review Modal -->
+    <div class="modal-overlay" id="modal-review-reply">
+      <div class="modal">
+        <div class="modal-header">
+          <div class="modal-title">Reply to Review</div>
+          <button class="btn btn-ghost btn-icon" onclick="closeModal('modal-review-reply')">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="review-reply-id" />
+          <div class="form-grid">
+            <div class="form-field full">
+              <label class="form-label">Customer review</label>
+              <div
+                id="review-reply-original"
+                style="background: var(--beige-100); padding: 10px 12px; font-size: 14px; line-height: 1.6; white-space: pre-wrap"
+              ></div>
+            </div>
+            <div class="form-field full">
+              <label class="form-label">Your response (shown to shoppers as "Seller Response")</label>
+              <textarea
+                class="form-textarea"
+                id="review-reply-body"
+                rows="5"
+                maxlength="500"
+                placeholder="Thank the customer or address their concern…"
+              ></textarea>
+              <div class="text-muted text-sm" id="review-reply-count" style="margin-top: 4px">0/500</div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" id="review-reply-remove" onclick="saveReviewReply(true)" style="margin-right: auto; color: var(--red)">
+            Remove response
+          </button>
+          <button class="btn btn-outline" onclick="closeModal('modal-review-reply')">Cancel</button>
+          <button class="btn btn-primary" onclick="saveReviewReply(false)">Post Response</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Add Product Modal -->
     <div class="modal-overlay" id="modal-add-product">
       <div class="modal">
@@ -2588,6 +2633,10 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
                 <div class="stat-label">Average rating</div>
                 <div class="stat-value" style="font-size: 24px" id="rv-stat-average">–</div>
               </div>
+              <div class="stat-card" style="flex: 1; min-width: 120px">
+                <div class="stat-label">Awaiting reply</div>
+                <div class="stat-value" style="font-size: 24px; color: var(--gold)" id="rv-stat-unanswered">–</div>
+              </div>
             </div>
 
             <div class="card">
@@ -2625,7 +2674,7 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
     <!-- /app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/safe.js?v=20261018"></script>
-    <script src="js/admin.js?v=20261018"></script>
+    <script src="js/safe.js?v=20261020"></script>
+    <script src="js/admin.js?v=20261020"></script>
   </body>
 </html>

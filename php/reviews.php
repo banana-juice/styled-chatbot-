@@ -2,9 +2,12 @@
 // ============================================================
 // PRODUCT REVIEWS (customer side) — php/reviews.php
 //
-//   GET    ?product_id=N[&page=1&limit=10]  public: summary + visible reviews,
+//   GET    ?product_id=N[&page=1&limit=10&rating=1-5&with_comment=1&sort=newest|helpful|highest|lowest]
+//                                           public: summary + visible reviews,
 //                                           plus what the signed-in viewer may do
 //   POST   {product_id, rating, comment}    review a product you received
+//   POST   {action:"vote", review_id, helpful:true|false}
+//                                           mark another customer's review helpful
 //   PUT    {product_id, rating, comment}    edit your own review
 //   DELETE {product_id}                     delete your own review
 // ============================================================
@@ -53,6 +56,43 @@ try {
     if ($source === null) {
         review_out(400, ['success' => false, 'error' => 'The request body must be valid JSON.']);
     }
+
+    // ── POST {action: "vote"} — "Helpful" on someone else's review ─────────────
+    if ($method === 'POST' && ($source['action'] ?? null) === 'vote') {
+        if (!$userId) {
+            review_out(401, ['success' => false, 'error' => 'Please sign in to mark reviews as helpful.']);
+        }
+        if (!empty($_SESSION['role']) && in_array($_SESSION['role'], ['admin', 'staff'], true)) {
+            review_out(403, ['success' => false, 'error' => 'Staff accounts cannot vote on reviews.']);
+        }
+        $reviewId = as_pos_int($source['review_id'] ?? 0);
+        $helpful  = $source['helpful'] ?? null;
+        if ($reviewId <= 0 || !is_bool($helpful)) {
+            review_out(400, ['success' => false, 'error' => 'review_id and helpful (true/false) are required.']);
+        }
+        $row = $pdo->prepare("
+            SELECT r.user_id
+            FROM product_reviews r
+            JOIN products p ON p.product_id = r.product_id
+            WHERE r.review_id = ? AND r.status = 'visible' AND p.status = 'active' AND p.is_active = 1");
+        $row->execute([$reviewId]);
+        $owner = $row->fetchColumn();
+        if ($owner === false) {
+            review_out(404, ['success' => false, 'error' => 'Review not found.']);
+        }
+        if ((int) $owner === $userId) {
+            review_out(403, ['success' => false, 'error' => "You can't mark your own review as helpful."]);
+        }
+        if ($helpful) {
+            $pdo->prepare('INSERT IGNORE INTO product_review_votes (review_id, user_id) VALUES (?, ?)')->execute([$reviewId, $userId]);
+        } else {
+            $pdo->prepare('DELETE FROM product_review_votes WHERE review_id = ? AND user_id = ?')->execute([$reviewId, $userId]);
+        }
+        $cnt = $pdo->prepare('SELECT COUNT(*) FROM product_review_votes WHERE review_id = ?');
+        $cnt->execute([$reviewId]);
+        review_out(200, ['success' => true, 'helpful_count' => (int) $cnt->fetchColumn(), 'i_voted' => $helpful]);
+    }
+
     $productId = as_pos_int($source['product_id'] ?? 0);
     if ($productId <= 0) {
         review_out(400, ['success' => false, 'error' => 'product_id is required.']);
@@ -67,7 +107,7 @@ try {
     // The viewer's own review (if any), used by every verb below.
     $mine = null;
     if ($userId) {
-        $q = $pdo->prepare('SELECT review_id, rating, comment, status, created_at, updated_at FROM product_reviews WHERE user_id = ? AND product_id = ?');
+        $q = $pdo->prepare('SELECT review_id, rating, comment, size, status, seller_reply, seller_reply_at, created_at, updated_at FROM product_reviews WHERE user_id = ? AND product_id = ?');
         $q->execute([$userId, $productId]);
         $mine = $q->fetch(PDO::FETCH_ASSOC) ?: null;
         if ($mine) {
@@ -82,25 +122,53 @@ try {
         $limit  = min(50, max(1, as_pos_int($_GET['limit'] ?? 10) ?: 10));
         $offset = ($page - 1) * $limit;
 
+        $rating      = reviews_parse_rating($_GET['rating'] ?? null);        // 0 = every star level
+        $withComment = ($_GET['with_comment'] ?? '') === '1';
+        $sort        = is_string($_GET['sort'] ?? null) ? $_GET['sort'] : 'newest';
+        $orderBy     = reviews_order_by($sort);
+
         $summary = reviews_summary($pdo, $productId);
 
+        $where  = "r.product_id = ? AND r.status = 'visible'";
+        $params = [$productId];
+        if ($rating) {
+            $where   .= ' AND r.rating = ?';
+            $params[] = $rating;
+        }
+        if ($withComment) {
+            $where .= " AND r.comment IS NOT NULL AND r.comment <> ''";
+        }
+
+        $tot = $pdo->prepare("SELECT COUNT(*) FROM product_reviews r WHERE $where");
+        $tot->execute($params);
+        $matching = (int) $tot->fetchColumn();
+
         $list = $pdo->prepare("
-            SELECT r.review_id, r.user_id, r.rating, r.comment, r.created_at, u.full_name
+            SELECT r.review_id, r.user_id, r.rating, r.comment, r.size, r.created_at,
+                   r.seller_reply, r.seller_reply_at, u.full_name,
+                   (SELECT COUNT(*) FROM product_review_votes v WHERE v.review_id = r.review_id) AS helpful_count,
+                   (SELECT COUNT(*) FROM product_review_votes v2 WHERE v2.review_id = r.review_id AND v2.user_id = ?) AS i_voted
             FROM product_reviews r
             LEFT JOIN users u ON u.user_id = r.user_id
-            WHERE r.product_id = ? AND r.status = 'visible'
-            ORDER BY r.created_at DESC, r.review_id DESC
+            WHERE $where
+            ORDER BY $orderBy
             LIMIT $limit OFFSET $offset");
-        $list->execute([$productId]);
+        $list->execute(array_merge([$userId], $params));
         $reviews = [];
         foreach ($list->fetchAll(PDO::FETCH_ASSOC) as $r) {
             $reviews[] = [
-                'review_id'  => (int) $r['review_id'],
-                'rating'     => (int) $r['rating'],
-                'comment'    => (string) ($r['comment'] ?? ''),
-                'created_at' => $r['created_at'],
-                'reviewer'   => reviews_display_name($r['full_name']),
-                'mine'       => $userId && (int) $r['user_id'] === $userId,
+                'review_id'       => (int) $r['review_id'],
+                'rating'          => (int) $r['rating'],
+                'comment'         => (string) ($r['comment'] ?? ''),
+                'size'            => (string) ($r['size'] ?? ''),
+                'created_at'      => $r['created_at'],
+                'reviewer'        => reviews_display_name($r['full_name']),
+                'verified'        => true, // only customers with a delivered order can review
+                'mine'            => $userId && (int) $r['user_id'] === $userId,
+                'helpful_count'   => (int) $r['helpful_count'],
+                'i_voted'         => (int) $r['i_voted'] > 0,
+                'seller_reply'    => (string) ($r['seller_reply'] ?? ''),
+                'seller_reply_at' => $r['seller_reply_at'],
             ];
         }
 
@@ -111,7 +179,9 @@ try {
             'summary'      => $summary,
             'reviews'      => $reviews,
             'page'         => $page,
-            'has_more'     => $offset + count($reviews) < $summary['count'],
+            'matching'     => $matching,
+            'has_more'     => $offset + count($reviews) < $matching,
+            'filter'       => ['rating' => $rating, 'with_comment' => $withComment, 'sort' => $sort],
             'viewer'       => [
                 'logged_in'  => (bool) $userId,
                 'can_review' => $eligible && !$mine,
@@ -149,9 +219,10 @@ try {
             if ($orderId <= 0) {
                 review_out(403, ['success' => false, 'error' => 'Only customers who have received this product can review it.']);
             }
+            $size = reviews_order_item_size($pdo, $orderId, $productId);
             try {
-                $pdo->prepare('INSERT INTO product_reviews (product_id, user_id, order_id, rating, comment) VALUES (?, ?, ?, ?, ?)')
-                    ->execute([$productId, $userId, $orderId, $rating, $comment]);
+                $pdo->prepare('INSERT INTO product_reviews (product_id, user_id, order_id, size, rating, comment) VALUES (?, ?, ?, ?, ?, ?)')
+                    ->execute([$productId, $userId, $orderId, $size !== '' ? $size : null, $rating, $comment]);
             } catch (PDOException $e) {
                 if ((string) $e->getCode() === '23000') { // double submit raced past the check above
                     review_out(409, ['success' => false, 'error' => 'You have already reviewed this product. You can edit your review.']);
@@ -171,6 +242,9 @@ try {
     }
 
     if ($method === 'DELETE') {
+        if ($mine) {
+            $pdo->prepare('DELETE FROM product_review_votes WHERE review_id = ?')->execute([$mine['review_id']]);
+        }
         $pdo->prepare('DELETE FROM product_reviews WHERE user_id = ? AND product_id = ?')->execute([$userId, $productId]);
         review_out(200, ['success' => true, 'summary' => reviews_summary($pdo, $productId)]);
     }

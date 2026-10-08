@@ -18,3 +18,16 @@ CREATE TABLE IF NOT EXISTS product_reviews (
 -- SKU was removed from the admin/staff UI. The product_sizes.sku column is
 -- no longer read or written; dropping it is optional:
 -- ALTER TABLE product_sizes DROP COLUMN sku;
+
+-- Ratings upgrade (Shopee-style): size bought, store reply, "Helpful" votes.
+-- Also created/added automatically by reviews_ensure_schema(); optional to run by hand.
+-- ALTER TABLE product_reviews ADD COLUMN size VARCHAR(10) NULL AFTER order_id;
+-- ALTER TABLE product_reviews ADD COLUMN seller_reply TEXT NULL;
+-- ALTER TABLE product_reviews ADD COLUMN seller_reply_at DATETIME NULL;
+CREATE TABLE IF NOT EXISTS product_review_votes (
+  review_id  INT NOT NULL,
+  user_id    INT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (review_id, user_id),
+  KEY idx_vote_user (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

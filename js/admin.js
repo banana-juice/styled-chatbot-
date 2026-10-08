@@ -1761,6 +1761,7 @@ async function renderReviews() {
       document.getElementById("rv-stat-average").textContent = data.stats.visible
         ? `${Number(data.stats.average).toFixed(1)} ★`
         : "–";
+      document.getElementById("rv-stat-unanswered").textContent = data.stats.unanswered ?? "–";
     }
 
     if (!data.success || !data.reviews.length) {
@@ -1768,6 +1769,7 @@ async function renderReviews() {
       document.getElementById("reviews-pagination").innerHTML = "";
       return;
     }
+    _reviewsById = new Map(data.reviews.map((r) => [Number(r.review_id), r]));
     body.innerHTML = data.reviews
       .map((r) => {
         const hidden = r.status === "hidden";
@@ -1777,11 +1779,16 @@ async function renderReviews() {
           <td style="font-weight:500;color:var(--brown-400)">${escapeHtml(r.product_name)}</td>
           <td class="text-muted">${escapeHtml(r.reviewer)}</td>
           <td>${reviewStars(r.rating)}</td>
-          <td class="text-muted text-sm" style="max-width:280px;white-space:normal" title="${escapeHtml(r.comment || "")}">${r.comment ? escapeHtml(r.comment) : "<em>No comment</em>"}</td>
+          <td class="text-muted text-sm" style="max-width:320px;white-space:normal">
+            <div>${r.comment ? escapeHtml(r.comment) : "<em>No comment</em>"}</div>
+            <div style="margin-top:4px;font-size:12px">${r.size ? `Size ${escapeHtml(r.size)} · ` : ""}${Number(r.helpful_count) || 0} found helpful</div>
+            ${r.seller_reply ? `<div style="margin-top:6px;padding:6px 8px;background:var(--beige-100);border-left:3px solid var(--gold)"><strong>Your response:</strong> ${escapeHtml(r.seller_reply)}</div>` : ""}
+          </td>
           <td>${statusBadge(r.status)}</td>
           <td class="text-muted">${fmtManila(r.created_at, MANILA_DATE_ONLY)}</td>
           <td>
             <div class="flex-center gap-6">
+              <button class="btn btn-outline btn-sm" onclick="openReviewReply(${id})">${r.seller_reply ? "Edit reply" : "Reply"}</button>
               <button class="btn btn-outline btn-sm" onclick="setReviewStatus(${id}, '${hidden ? "visible" : "hidden"}')">${hidden ? "Show" : "Hide"}</button>
               <button class="btn btn-outline btn-sm" style="color:var(--red)" onclick="deleteReview(${id})">Delete</button>
             </div>
@@ -1799,6 +1806,45 @@ async function renderReviews() {
   } catch (err) {
     console.error("[admin]", err);
     tableError("reviews-body", 7);
+  }
+}
+
+let _reviewsById = new Map();
+
+function openReviewReply(id) {
+  const r = _reviewsById.get(Number(id));
+  if (!r) return;
+  document.getElementById("review-reply-id").value = String(r.review_id);
+  document.getElementById("review-reply-original").textContent =
+    `${"★".repeat(Number(r.rating) || 0)}${"☆".repeat(5 - (Number(r.rating) || 0))}  ${r.reviewer} on ${r.product_name}\n` +
+    (r.comment ? r.comment : "(no comment)");
+  const body = document.getElementById("review-reply-body");
+  body.value = r.seller_reply || "";
+  document.getElementById("review-reply-count").textContent = `${body.value.length}/500`;
+  document.getElementById("review-reply-remove").style.display = r.seller_reply ? "" : "none";
+  body.oninput = () => (document.getElementById("review-reply-count").textContent = `${body.value.length}/500`);
+  openModal("modal-review-reply");
+}
+
+async function saveReviewReply(remove) {
+  const id = Number(document.getElementById("review-reply-id").value);
+  const text = remove ? "" : document.getElementById("review-reply-body").value.trim();
+  if (!remove && !text) {
+    showToast("Write a response first, or use Remove response.", "error");
+    return;
+  }
+  try {
+    await fetchJSON(`${API}/reviews.php`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ review_id: id, reply: text }),
+    });
+    closeModal("modal-review-reply");
+    showToast(remove ? "Response removed." : "Response posted.");
+    renderReviews();
+  } catch (err) {
+    console.error("[admin]", err);
+    showToast("Could not save the response.", "error");
   }
 }
 

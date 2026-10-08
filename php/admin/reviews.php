@@ -3,7 +3,9 @@
 // PRODUCT REVIEWS (admin moderation) — php/admin/reviews.php
 //
 //   GET     ?status=&rating=&search=&page=&limit=   list every review
-//   PUT     {review_id, status: visible|hidden}     hide / show a review
+//   PUT     {review_id, status?: visible|hidden, reply?: "text"|""}
+//                                                   hide/show a review and/or set
+//                                                   (or clear, with "") the store's reply
 //   DELETE  {review_id}                             delete a review
 // ============================================================
 
@@ -25,6 +27,12 @@ require_once __DIR__ . '/../reviews_lib.php';
 
 requireAuth('admin');
 $method = $_SERVER['REQUEST_METHOD'];
+
+function admin_review_fail(int $code, string $msg): void {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'error' => $msg]);
+    exit;
+}
 
 try {
     $pdo = getPDO();
@@ -64,7 +72,9 @@ try {
         $total = (int) $t->fetchColumn();
 
         $stmt = $pdo->prepare("
-            SELECT r.review_id, r.product_id, r.rating, r.comment, r.status, r.created_at,
+            SELECT r.review_id, r.product_id, r.rating, r.comment, r.size, r.status, r.created_at,
+                   r.seller_reply, r.seller_reply_at,
+                   (SELECT COUNT(*) FROM product_review_votes v WHERE v.review_id = r.review_id) AS helpful_count,
                    COALESCE(p.name, 'Deleted product') AS product_name,
                    COALESCE(u.full_name, 'Deleted user') AS reviewer
             $from
@@ -74,15 +84,17 @@ try {
 
         $counts = $pdo->query("SELECT status, COUNT(*) FROM product_reviews GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
         $avg    = $pdo->query("SELECT ROUND(AVG(rating), 1) FROM product_reviews WHERE status = 'visible'")->fetchColumn();
+        $unans  = (int) $pdo->query("SELECT COUNT(*) FROM product_reviews WHERE status = 'visible' AND (seller_reply IS NULL OR seller_reply = '')")->fetchColumn();
 
         echo json_encode([
             'success' => true,
             'reviews' => $stmt->fetchAll(PDO::FETCH_ASSOC),
             'total'   => $total,
             'stats'   => [
-                'visible' => (int) ($counts['visible'] ?? 0),
-                'hidden'  => (int) ($counts['hidden'] ?? 0),
-                'average' => $avg !== null ? (float) $avg : 0,
+                'visible'    => (int) ($counts['visible'] ?? 0),
+                'hidden'     => (int) ($counts['hidden'] ?? 0),
+                'average'    => $avg !== null ? (float) $avg : 0,
+                'unanswered' => $unans,
             ],
         ]);
         exit;
@@ -92,48 +104,63 @@ try {
     $body     = is_array($body) ? $body : [];
     $reviewId = as_pos_int($body['review_id'] ?? 0);
     if ($reviewId <= 0) {
-        http_response_code(400);
-        echo json_encode(['success' => false, 'error' => 'review_id is required.']);
-        exit;
+        admin_review_fail(400, 'review_id is required.');
     }
 
     if ($method === 'PUT') {
-        $newStatus = $body['status'] ?? null;
-        if (!is_string($newStatus) || !in_array($newStatus, ['visible', 'hidden'], true)) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'status must be "visible" or "hidden".']);
-            exit;
+        $hasStatus = array_key_exists('status', $body);
+        $hasReply  = array_key_exists('reply', $body);
+        if (!$hasStatus && !$hasReply) {
+            admin_review_fail(400, 'status must be "visible" or "hidden" (or send a reply).');
         }
-        $upd = $pdo->prepare('UPDATE product_reviews SET status = ? WHERE review_id = ?');
-        $upd->execute([$newStatus, $reviewId]);
+        $newStatus = null;
+        if ($hasStatus) {
+            $newStatus = $body['status'];
+            if (!is_string($newStatus) || !in_array($newStatus, ['visible', 'hidden'], true)) {
+                admin_review_fail(400, 'status must be "visible" or "hidden".');
+            }
+        }
+        $reply = null;
+        if ($hasReply) {
+            $reply = reviews_clean_comment($body['reply'], REVIEW_REPLY_MAX);
+            if ($reply === null) {
+                admin_review_fail(400, 'The reply must be text of at most ' . REVIEW_REPLY_MAX . ' characters.');
+            }
+        }
+
         $exists = $pdo->prepare('SELECT 1 FROM product_reviews WHERE review_id = ?');
         $exists->execute([$reviewId]);
         if (!$exists->fetchColumn()) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Review not found.']);
-            exit;
+            admin_review_fail(404, 'Review not found.');
+        }
+        if ($hasStatus) {
+            $pdo->prepare('UPDATE product_reviews SET status = ? WHERE review_id = ?')->execute([$newStatus, $reviewId]);
+        }
+        if ($hasReply) {
+            if ($reply === '') {
+                $pdo->prepare('UPDATE product_reviews SET seller_reply = NULL, seller_reply_at = NULL WHERE review_id = ?')->execute([$reviewId]);
+            } else {
+                $pdo->prepare('UPDATE product_reviews SET seller_reply = ?, seller_reply_at = NOW() WHERE review_id = ?')->execute([$reply, $reviewId]);
+            }
         }
         echo json_encode(['success' => true]);
         exit;
     }
 
     if ($method === 'DELETE') {
+        $pdo->prepare('DELETE FROM product_review_votes WHERE review_id = ?')->execute([$reviewId]);
         $del = $pdo->prepare('DELETE FROM product_reviews WHERE review_id = ?');
         $del->execute([$reviewId]);
         if ($del->rowCount() === 0) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => 'Review not found.']);
-            exit;
+            admin_review_fail(404, 'Review not found.');
         }
         echo json_encode(['success' => true]);
         exit;
     }
 
-    http_response_code(405);
-    echo json_encode(['success' => false, 'error' => 'Method not allowed.']);
+    admin_review_fail(405, 'Method not allowed.');
 
 } catch (Throwable $e) {
     error_log('admin/reviews.php: ' . $e->getMessage());
-    http_response_code(500);
-    echo json_encode(['success' => false, 'error' => 'Server error.']);
+    admin_review_fail(500, 'Server error.');
 }

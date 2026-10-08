@@ -1455,12 +1455,38 @@ function buildProductModal() {
 }
 
 // ============================================
-// PRODUCT REVIEWS (inside the product modal)
+// PRODUCT REVIEWS (inside the product modal) — Shopee-style ratings
+//   * big score + filter chips (All / 5-1 Star / With Comments) with counts
+//   * sort: newest / most helpful / highest / lowest
+//   * each review: avatar, stars, date, size bought ("Variation"), Verified
+//     Purchase, "Helpful" votes, and the store's "Seller Response"
 // Only customers whose order containing the product was Delivered can post
 // (the server enforces it); everyone can read. All text is escaped.
 // ============================================
 let _reviewToken = 0; // a slow answer for a product the modal no longer shows is ignored
-const _reviewState = { productId: 0, page: 1, hasMore: false, viewer: null, editing: false, rating: 0, focus: false };
+let _reviewSeq = 0; // a slow answer to an older filter/sort/page request is ignored
+const _reviewState = {
+  productId: 0,
+  page: 1,
+  hasMore: false,
+  viewer: null,
+  summary: null,
+  editing: false,
+  rating: 0, // the star the customer picked in the write-a-review form
+  focus: false,
+  filterRating: 0, // 0 = every star level
+  filterComment: false,
+  sort: "newest",
+};
+const REVIEW_SORTS = [
+  ["newest", "Newest"],
+  ["helpful", "Most helpful"],
+  ["highest", "Highest rating"],
+  ["lowest", "Lowest rating"],
+];
+const REVIEW_AVATAR_COLORS = ["#b8893a", "#7a6a5a", "#8c6d57", "#5c3d2e", "#9a7b4f", "#6b5b4b"];
+const ICON_THUMB = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>`;
+const ICON_CHECK = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>`;
 
 function starString(avg) {
   const n = Math.max(0, Math.min(5, Math.round(Number(avg) || 0)));
@@ -1471,13 +1497,33 @@ function reviewCountLabel(count) {
   return `${count} review${count === 1 ? "" : "s"}`;
 }
 
-function reviewDate(s) {
+/** "2026-10-08 14:32" in Manila time, the way marketplaces print review dates. */
+function reviewDateTime(s) {
   try {
     const d = typeof parseServerDate === "function" ? parseServerDate(s) : new Date(s);
-    return d.toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Manila" });
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Manila",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(d)
+      .reduce((o, p) => ((o[p.type] = p.value), o), {});
+    return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
   } catch (_) {
     return "";
   }
+}
+
+function reviewAvatar(name) {
+  const text = String(name || "?").trim();
+  const initial = (Array.from(text)[0] || "?").toUpperCase();
+  let h = 0;
+  for (const ch of text) h = (h + ch.codePointAt(0)) % 997;
+  return `<span class="rv-avatar" style="background:${REVIEW_AVATAR_COLORS[h % REVIEW_AVATAR_COLORS.length]}" aria-hidden="true">${escapeHtml(initial)}</span>`;
 }
 
 function renderModalStars(avg, count) {
@@ -1507,6 +1553,30 @@ function updateCardRating(productId, avg, count) {
   });
 }
 
+function reviewFilterKey() {
+  if (_reviewState.filterComment) return "comment";
+  if (_reviewState.filterRating) return "r" + _reviewState.filterRating;
+  return "all";
+}
+
+function syncReviewFilterUI() {
+  const key = reviewFilterKey();
+  document.querySelectorAll("#pm-reviews-summary .rv-chip").forEach((c) => {
+    const on = c.dataset.chip === key;
+    c.classList.toggle("active", on);
+    c.setAttribute("aria-pressed", on ? "true" : "false");
+  });
+  const sel = document.getElementById("rv-sort");
+  if (sel) sel.value = _reviewState.sort;
+}
+
+/** True when the selected filter has no reviews left (e.g. after a delete) and must go back to "All". */
+function reviewFilterIsEmpty(summary) {
+  if (_reviewState.filterComment) return !(summary.with_comments > 0);
+  if (_reviewState.filterRating) return !(Number(summary.distribution?.[_reviewState.filterRating]) > 0);
+  return false;
+}
+
 function renderReviewSummary(summary) {
   const el = document.getElementById("pm-reviews-summary");
   if (!el) return;
@@ -1514,37 +1584,81 @@ function renderReviewSummary(summary) {
     el.innerHTML = `<p class="rv-note">No reviews yet.</p>`;
     return;
   }
-  const rows = [5, 4, 3, 2, 1]
-    .map((s) => {
-      const n = Number(summary.distribution?.[s]) || 0;
-      const pct = Math.round((n / summary.count) * 100);
-      return `<div class="rv-bar-row"><span>${s}★</span><div class="rv-bar"><div style="width:${pct}%"></div></div><span>${n}</span></div>`;
-    })
-    .join("");
+  const chip = (key, label, n) =>
+    `<button type="button" class="rv-chip" data-chip="${key}" aria-pressed="false" ${n > 0 ? "" : "disabled"}>${label} <span class="rv-chip-n">(${n})</span></button>`;
+  const chips =
+    chip("all", "All", summary.count) +
+    [5, 4, 3, 2, 1].map((s) => chip("r" + s, `${s} Star`, Number(summary.distribution?.[s]) || 0)).join("") +
+    chip("comment", "With Comments", Number(summary.with_comments) || 0);
+
   el.innerHTML = `
-    <div class="rv-summary">
-      <div class="rv-avg">
-        <span class="rv-avg-num">${Number(summary.average).toFixed(1)}</span>
-        <span class="rv-avg-stars">${starString(summary.average)}</span>
-        <span class="rv-avg-count">${reviewCountLabel(summary.count)}</span>
+    <div class="rv-head">
+      <div class="rv-score">
+        <div class="rv-score-line"><span class="rv-score-num">${Number(summary.average).toFixed(1)}</span><span class="rv-score-of"> out of 5</span></div>
+        <div class="rv-score-stars" aria-label="${Number(summary.average).toFixed(1)} out of 5 stars">${starString(summary.average)}</div>
+        <div class="rv-score-count">${reviewCountLabel(summary.count)}</div>
       </div>
-      <div class="rv-bars">${rows}</div>
+      <div class="rv-chips" role="group" aria-label="Filter reviews">${chips}</div>
+    </div>
+    <div class="rv-toolbar">
+      <label class="rv-sort-label">Sort by
+        <select id="rv-sort" class="rv-sort">${REVIEW_SORTS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select>
+      </label>
     </div>`;
+
+  el.querySelectorAll(".rv-chip").forEach((c) =>
+    c.addEventListener("click", () => {
+      const key = c.dataset.chip;
+      _reviewState.filterComment = key === "comment";
+      _reviewState.filterRating = /^r[1-5]$/.test(key) ? Number(key.slice(1)) : 0;
+      syncReviewFilterUI();
+      loadModalReviews(_reviewState.productId, false, true);
+    }),
+  );
+  document.getElementById("rv-sort").addEventListener("change", (e) => {
+    _reviewState.sort = REVIEW_SORTS.some(([v]) => v === e.target.value) ? e.target.value : "newest";
+    loadModalReviews(_reviewState.productId, false, true);
+  });
+  syncReviewFilterUI();
+}
+
+function helpfulButtonHtml(r) {
+  const n = Number(r.helpful_count) || 0;
+  if (r.mine) {
+    return n > 0 ? `<span class="rv-helpful-static">${ICON_THUMB}<span>${n} found this helpful</span></span>` : "";
+  }
+  return `<button type="button" class="rv-helpful${r.i_voted ? " on" : ""}" data-id="${Number(r.review_id)}" aria-pressed="${r.i_voted ? "true" : "false"}">${ICON_THUMB}<span class="rv-helpful-label">Helpful</span><span class="rv-helpful-n" data-n="${n}">${n > 0 ? ` (${n})` : ""}</span></button>`;
 }
 
 function renderReviewList(reviews, append) {
   const list = document.getElementById("pm-reviews-list");
   if (!list) return;
+  if (!append && !(reviews || []).length) {
+    list.innerHTML = `<p class="rv-note">No reviews match this filter.</p>`;
+    const more = document.getElementById("pm-reviews-more");
+    if (more) more.style.display = "none";
+    return;
+  }
   const html = (reviews || [])
     .map(
       (r) => `
     <div class="rv-item${r.mine ? " rv-mine" : ""}">
-      <div class="rv-item-head">
-        <span class="rv-item-stars">${starString(r.rating)}</span>
-        <span class="rv-item-name">${escapeHtml(r.reviewer)}${r.mine ? ' <em class="rv-you">You</em>' : ""}</span>
-        <span class="rv-item-date">${escapeHtml(reviewDate(r.created_at))}</span>
+      ${reviewAvatar(r.reviewer)}
+      <div class="rv-main">
+        <div class="rv-item-name">${escapeHtml(r.reviewer)}${r.mine ? ' <em class="rv-you">You</em>' : ""}</div>
+        <div class="rv-item-stars" aria-label="${Number(r.rating)} out of 5 stars">${starString(r.rating)}</div>
+        <div class="rv-item-meta">
+          <span>${escapeHtml(reviewDateTime(r.created_at))}</span>${r.size ? `<span class="rv-sep">|</span><span>Variation: ${escapeHtml(r.size)}</span>` : ""}
+        </div>
+        <div class="rv-verified">${ICON_CHECK}<span>Verified Purchase</span></div>
+        ${r.comment ? `<p class="rv-item-text">${escapeHtml(r.comment).replace(/\n/g, "<br>")}</p>` : ""}
+        ${
+          r.seller_reply
+            ? `<div class="rv-reply"><div class="rv-reply-title">Seller Response</div><p class="rv-reply-text">${escapeHtml(r.seller_reply).replace(/\n/g, "<br>")}</p></div>`
+            : ""
+        }
+        ${helpfulButtonHtml(r)}
       </div>
-      ${r.comment ? `<p class="rv-item-text">${escapeHtml(r.comment).replace(/\n/g, "<br>")}</p>` : ""}
     </div>`,
     )
     .join("");
@@ -1552,6 +1666,48 @@ function renderReviewList(reviews, append) {
   else list.innerHTML = html;
   const more = document.getElementById("pm-reviews-more");
   if (more) more.style.display = _reviewState.hasMore ? "" : "none";
+}
+
+function setHelpfulUI(btn, on, n) {
+  btn.classList.toggle("on", !!on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  const c = btn.querySelector(".rv-helpful-n");
+  c.dataset.n = String(n);
+  c.textContent = n > 0 ? ` (${n})` : "";
+}
+
+/** "Helpful" on someone else's review. Optimistic, then settled by the server's count. */
+async function toggleHelpful(btn) {
+  if (!getCurrentUser()) {
+    showToast("Sign in to mark reviews as helpful.");
+    return;
+  }
+  if (btn.disabled) return;
+  btn.disabled = true;
+  const want = btn.getAttribute("aria-pressed") !== "true";
+  const prevOn = !want;
+  const prevN = Number(btn.querySelector(".rv-helpful-n").dataset.n) || 0;
+  setHelpfulUI(btn, want, Math.max(0, prevN + (want ? 1 : -1)));
+  try {
+    const res = await fetch(`${API_BASE}/php/reviews.php`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "vote", review_id: Number(btn.dataset.id), helpful: want }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.success) {
+      setHelpfulUI(btn, prevOn, prevN);
+      showToast(data.error || "Could not save your vote. Please try again.");
+    } else {
+      setHelpfulUI(btn, data.i_voted, data.helpful_count);
+    }
+  } catch (_) {
+    setHelpfulUI(btn, prevOn, prevN);
+    showToast("Network error. Please try again.");
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 function renderReviewForm(viewer) {
@@ -1692,30 +1848,48 @@ async function deleteMyReview() {
   }
 }
 
-async function loadModalReviews(productId, append = false) {
+/**
+ * Load reviews for the open product. listOnly = a filter/sort change: refresh only
+ * the list so a half-written review in the form is never wiped.
+ */
+async function loadModalReviews(productId, append = false, listOnly = false, _retried = false) {
   const token = _reviewToken;
+  // Every load gets a number; an answer that is no longer for the newest request
+  // (the customer clicked another chip / sort / Show more meanwhile) is dropped, so a
+  // slow earlier response can never overwrite what the latest click asked for.
+  const seq = ++_reviewSeq;
   const page = append ? _reviewState.page + 1 : 1;
+  const q = new URLSearchParams({ product_id: productId, page, limit: 5, sort: _reviewState.sort });
+  if (_reviewState.filterRating) q.set("rating", _reviewState.filterRating);
+  if (_reviewState.filterComment) q.set("with_comment", "1");
   let data;
   try {
-    const res = await fetch(`${API_BASE}/php/reviews.php?product_id=${productId}&page=${page}&limit=5`, {
-      credentials: "include",
-    });
+    const res = await fetch(`${API_BASE}/php/reviews.php?${q}`, { credentials: "include" });
     data = await res.json();
   } catch (_) {
     return;
   }
-  if (token !== _reviewToken || !data || !data.success) return;
+  if (token !== _reviewToken || seq !== _reviewSeq || !data || !data.success) return;
+
+  // The chosen filter lost its last review (deleted/hidden meanwhile): fall back to All.
+  if (!append && !_retried && reviewFilterIsEmpty(data.summary)) {
+    _reviewState.filterRating = 0;
+    _reviewState.filterComment = false;
+    return loadModalReviews(productId, false, false, true);
+  }
+
   _reviewState.page = page;
   _reviewState.hasMore = !!data.has_more;
   _reviewState.viewer = data.viewer;
+  _reviewState.summary = data.summary;
   renderModalStars(data.summary.average, data.summary.count);
   updateCardRating(productId, data.summary.average, data.summary.count);
-  if (!append) {
+  if (!append && !listOnly) {
     renderReviewSummary(data.summary);
     renderReviewForm(data.viewer);
   }
   renderReviewList(data.reviews, append);
-  if (_reviewState.focus && !append) {
+  if (_reviewState.focus && !append && !listOnly) {
     _reviewState.focus = false;
     document.getElementById("pm-reviews-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
@@ -1726,7 +1900,19 @@ function initModalReviews(product, opts = {}) {
   _reviewToken++;
   const sec = document.getElementById("pm-reviews-section");
   const pid = Number(product.product_id) || 0;
-  Object.assign(_reviewState, { productId: pid, page: 1, hasMore: false, viewer: null, editing: false, rating: 0, focus: !!opts.focusReviews });
+  Object.assign(_reviewState, {
+    productId: pid,
+    page: 1,
+    hasMore: false,
+    viewer: null,
+    summary: null,
+    editing: false,
+    rating: 0,
+    focus: !!opts.focusReviews,
+    filterRating: 0,
+    filterComment: false,
+    sort: "newest",
+  });
   if (!sec) return;
   if (!pid) {
     sec.style.display = "none";
@@ -1738,7 +1924,15 @@ function initModalReviews(product, opts = {}) {
   else renderModalStars(0, 0);
   document.getElementById("pm-reviews-summary").innerHTML = "";
   document.getElementById("pm-review-form-wrap").innerHTML = "";
-  document.getElementById("pm-reviews-list").innerHTML = `<p class="rv-note">Loading reviews…</p>`;
+  const list = document.getElementById("pm-reviews-list");
+  list.innerHTML = `<p class="rv-note">Loading reviews…</p>`;
+  if (!list.dataset.bound) {
+    list.dataset.bound = "1";
+    list.addEventListener("click", (e) => {
+      const b = e.target.closest(".rv-helpful");
+      if (b) toggleHelpful(b);
+    });
+  }
   const more = document.getElementById("pm-reviews-more");
   if (more) more.style.display = "none";
   loadModalReviews(pid);
