@@ -1070,6 +1070,12 @@ a.pd-header-link:hover .pd-name {
 .pm-right {
   padding: 36px 32px;
   overflow-y: auto;
+  /* The window clips overflow, so this column must be height-limited itself
+     or it never scrolls and everything below "Add to Cart" (reviews, the review
+     form) is unreachable for a mouse wheel or a finger. */
+  max-height: 90vh;
+  max-height: 90dvh;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1642,4 +1648,37 @@ a.pd-header-link:hover .pd-name {
 .od-review-btn:hover {
   background: var(--cream);
   border-color: var(--taupe);
+}
+
+/* Product window on phones: stack the photo above the details and let the
+   whole window scroll, so the size picker, Add to Cart and the reviews are
+   all reachable. */
+@media (max-width: 640px) {
+  .pm-box {
+    grid-template-columns: 1fr;
+    width: 96%;
+    max-height: 92vh;
+    max-height: 92dvh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .pm-left {
+    height: 260px;
+  }
+  .pm-right {
+    max-height: none;
+    overflow: visible;
+    padding: 22px 18px 28px;
+  }
+  .rv-summary {
+    gap: 14px;
+  }
+  .rv-form-foot {
+    flex-wrap: wrap;
+  }
+  .rv-star {
+    font-size: 34px;
+    padding: 0 4px;
+  }
 }

@@ -79,7 +79,11 @@ function reviews_clean_comment($v): ?string {
     if (!is_string($v)) {
         return null;
     }
-    $v = preg_replace('/[^\P{C}\n]/u', '', str_replace(["\r\n", "\r"], "\n", $v));
+    $v = str_replace(["\r\n", "\r", "\t"], ["\n", "\n", ' '], $v);
+    // Drop control codes (keeping newlines) and characters that can spoof or hide
+    // text: bidi overrides/isolates, zero-width space, word joiner, BOM, soft hyphen.
+    // Joiners (U+200D / U+200C) are kept: emoji families and Persian/Indic words need them.
+    $v = preg_replace('/[\x00-\x09\x0B-\x1F\x7F]|[\x{80}-\x{9F}]|[\x{00AD}\x{200B}\x{2060}\x{FEFF}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $v);
     if ($v === null) {
         return null; // invalid UTF-8
     }
