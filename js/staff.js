@@ -1120,6 +1120,11 @@ async function saveSizeStock() {
     if (saveBtn) setButtonLoading(saveBtn, false);
   }
 }
+// The search box on the Inventory page (it called this, but only admin.js defined it, so typing threw an error).
+function filterInventory(q) {
+  inventorySearch = String(q || "").trim();
+  renderInventory();
+}
 function filterInventoryByStatus(status) {
   inventoryStockFilter = status;
   renderInventory();

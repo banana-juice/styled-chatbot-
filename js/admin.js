@@ -2381,7 +2381,8 @@ async function saveProductImages() {
     return;
   }
 
-  const fileInput = document.getElementById("new-product-images");
+  // The edit screen has its own file input (the Add Product dialog has "new-product-images").
+  const fileInput = document.getElementById("edit-product-images");
   const files = fileInput ? Array.from(fileInput.files) : [];
 
   // Build actions array
@@ -2422,6 +2423,8 @@ async function saveProductImages() {
         displayProductImages(refreshData.product.images || []);
         // Clear file input
         if (fileInput) fileInput.value = "";
+        const picked = document.getElementById("edit-product-images-names");
+        if (picked) picked.textContent = "";
         imagesToDelete = [];
         newPrimaryId = null;
       }
@@ -2642,6 +2645,19 @@ function init() {
   populateUserInfo();
   loadSettings();
   renderDashboard();
+
+  // Tell the admin which photos they picked on the edit screen (nothing is uploaded until "Save Images")
+  const editImages = document.getElementById("edit-product-images");
+  if (editImages) {
+    editImages.addEventListener("change", function () {
+      const out = document.getElementById("edit-product-images-names");
+      if (out) {
+        out.textContent = editImages.files.length
+          ? `${editImages.files.length} photo(s) selected: ${Array.from(editImages.files).map((f) => f.name).join(", ")} — click Save Images to upload.`
+          : "";
+      }
+    });
+  }
 
   // Preview selected images in the "Add Product" modal
   const imageInput = document.getElementById("new-product-images");

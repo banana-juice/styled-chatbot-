@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Styled — Admin Dashboard</title>
+    <link rel="icon" type="image/png" href="assets/images/logo_styled.png" />
 
     <link rel="stylesheet" href="css/admin.css?v=20260923" />
     <style>
@@ -1461,16 +1462,21 @@
                         </div>
                         <input
                           type="file"
-                          id="new-product-images"
+                          id="edit-product-images"
                           accept="image/jpeg,image/png,image/webp"
                           multiple
                           style="display: none"
                         />
+                        <div
+                          id="edit-product-images-names"
+                          class="text-muted text-sm"
+                          style="margin: 6px 0"
+                        ></div>
                         <button
                           class="btn btn-outline btn-sm"
                           onclick="
                             document
-                              .getElementById('new-product-images')
+                              .getElementById('edit-product-images')
                               .click()
                           "
                         >
@@ -2674,7 +2680,7 @@ Shop the Oversized Wool Coat at Styled — timeless luxury fashion for every mom
     <!-- /app-shell -->
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="js/safe.js?v=20261020"></script>
-    <script src="js/admin.js?v=20261020"></script>
+    <script src="js/safe.js?v=20261021"></script>
+    <script src="js/admin.js?v=20261021"></script>
   </body>
 </html>
