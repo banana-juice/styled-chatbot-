@@ -771,9 +771,56 @@ function isInWishlist(name) {
   return getWishlist().some((i) => i.name === name);
 }
 
-/** Toggle a product in/out of the wishlist; hits the API in background. */
+/**
+ * The product's id: carried by the product itself, or else looked up by name. The
+ * lookup must search by name: the plain product list returns only its first page
+ * (12 of the catalogue), so a product beyond it could never be found.
+ */
+async function _resolveWishlistProductId(product) {
+  const known = Number(product.product_id);
+  if (known > 0) return known;
+  try {
+    const want = String(product.name || "").trim().toLowerCase();
+    const raw = await fetchProducts({ search: product.name });
+    const norm = raw.map(normaliseProduct);
+    _updateProductCache(norm);
+    const match = norm.find((p) => String(p.name).trim().toLowerCase() === want);
+    return match ? Number(match.product_id) : 0;
+  } catch (_) {
+    return 0;
+  }
+}
+
+// Server updates go out one at a time, in click order, so quick clicks can't overtake each other.
+let _wishlistQueue = Promise.resolve();
+
+/** Tell the server about one add/remove. Returns true when it was saved (or the visitor is a guest). */
+async function _syncWishlistToServer(product, removing) {
+  if (!getCurrentUser()) return true; // guests keep a local-only wishlist
+  const productId = await _resolveWishlistProductId(product);
+  if (!productId) return false;
+  try {
+    const res = await fetch(`${API_BASE}/php/wishlist.php`, {
+      method: removing ? "DELETE" : "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ product_id: productId }),
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data || !data.success || !Array.isArray(data.items)) return false;
+    _wishlistCache = data.items; // the server's list is the truth
+    _saveWishlistToStorage(data.items);
+    return true;
+  } catch (e) {
+    console.warn("toggleWishlistItem API call failed:", e);
+    return false;
+  }
+}
+
+/** Toggle a product in/out of the wishlist. The heart updates at once; if the server refuses, it is put back and the customer is told. */
 async function toggleWishlistItem(product) {
-  const list = getWishlist();
+  const list = getWishlist().slice();
   const idx = list.findIndex((i) => i.name === product.name);
   const removing = idx >= 0;
 
@@ -783,35 +830,14 @@ async function toggleWishlistItem(product) {
   await saveWishlist(list);
   updateWishlistBadge();
 
-  // Resolve product_id for API if missing
-  let productId = product.product_id || 0;
-  if (!productId) {
-    try {
-      const categoryKey = product.category || "";
-      const raw = await fetchProducts(
-        categoryKey ? { category: categoryKey } : {},
-      );
-      const norm = raw.map(normaliseProduct);
-      _updateProductCache(norm);
-      const match = norm.find(
-        (p) =>
-          p.name.trim().toLowerCase() === product.name.trim().toLowerCase(),
-      );
-      if (match) productId = match.product_id;
-    } catch (_) {}
-  }
+  const saved = await (_wishlistQueue = _wishlistQueue.then(() => _syncWishlistToServer(product, removing)));
 
-  if (productId) {
-    try {
-      await fetch(`${API_BASE}/php/wishlist.php`, {
-        method: removing ? "DELETE" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId }),
-      });
-    } catch (e) {
-      console.warn("toggleWishlistItem API call failed:", e);
-    }
+  if (!saved) {
+    // Undo the optimistic change so the heart never shows something the server doesn't have.
+    const back = getWishlist().filter((i) => i.name !== product.name);
+    if (removing) back.push(product);
+    await saveWishlist(back);
+    showToast("Couldn't update your wishlist. Please try again.", "error");
   }
 
   updateWishlistBadge();
@@ -1197,27 +1223,8 @@ async function addWishlistItemToCart(product) {
     return;
   }
 
-  let productId = product.product_id || 0;
-
-  // Wishlist items saved from localStorage may not carry product_id —
-  // resolve it from the API by matching on name, same as the product modal does.
-  if (!productId) {
-    try {
-      const categoryKey = product.category || "";
-      const raw = await fetchProducts(
-        categoryKey ? { category: categoryKey } : {},
-      );
-      const norm = raw.map(normaliseProduct);
-      _updateProductCache(norm);
-      const match = norm.find(
-        (p) =>
-          p.name.trim().toLowerCase() === product.name.trim().toLowerCase(),
-      );
-      if (match) productId = match.product_id;
-    } catch (err) {
-      console.error("addWishlistItemToCart: failed to resolve product_id", err);
-    }
-  }
+  // Wishlist items saved from localStorage may not carry product_id — look it up by name.
+  const productId = await _resolveWishlistProductId(product);
 
   if (!productId) {
     showToast("Could not add to cart — product not found.");

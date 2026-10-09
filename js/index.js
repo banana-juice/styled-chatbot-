@@ -180,7 +180,7 @@ async function renderProducts(cat) {
       const safeName = escapeHtml(p.name);
       const cartData = escapeHtml(JSON.stringify({ ...p, price: formattedPrice }));
       const wishData = escapeHtml(
-        JSON.stringify({ name: p.name, price: formattedPrice, img: imgSrc, description: p.description }),
+        JSON.stringify({ product_id: Number(p.product_id), name: p.name, price: formattedPrice, img: imgSrc, description: p.description, category: cat }),
       );
       const reviewCount = Number(p.review_count) || 0;
       const ratingLine = reviewCount > 0
