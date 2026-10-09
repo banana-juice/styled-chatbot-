@@ -696,6 +696,13 @@ async function updateOrderStatus(orderId) {
       if (el)
         el.outerHTML = `<span id="detail-status-badge">${statusBadge(status)}</span>`;
       showToast("Order updated successfully.", "ok");
+      // Reload the order so anything the server changed along with the status
+      // (a cash-on-delivery order turning Paid) shows without a manual refresh.
+      const orderNumber = document
+        .getElementById("detail-order-id")
+        ?.textContent.replace("Order #", "")
+        .trim();
+      if (orderNumber) openOrderDetail(orderNumber);
     } else {
       showToast(data.error || "Update failed.", "error");
     }

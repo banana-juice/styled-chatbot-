@@ -1276,6 +1276,7 @@ async function addWishlistItemToCart(product) {
         in_stock: true,
       },
       (product.category || "").toLowerCase(),
+      { fromWishlist: true }, // so adding it to the cart from here also takes it off the wishlist
     );
     showToast("Choose a size to add it to your cart.");
     return;
@@ -1284,7 +1285,15 @@ async function addWishlistItemToCart(product) {
   await saveCart({ product_id: productId, size: sizes[0].size, qty: 1, add: true });
   await getCart();
   if (!_lastCartOk) return; // the server refused it; the toast already says why
-  showToast("Added to cart!");
+  await removeFromWishlistAfterCart(product);
+  showToast("Moved to your cart!");
+}
+
+/** An item that has been moved from the wishlist into the cart leaves the wishlist. */
+async function removeFromWishlistAfterCart(product) {
+  const want = String(product.name || "").trim().toLowerCase();
+  const saved = getWishlist().find((i) => String(i.name).trim().toLowerCase() === want);
+  if (saved) await toggleWishlistItem(saved); // it is in the list, so this removes it
 }
 
 function showToast(msg) {
@@ -1450,6 +1459,13 @@ function buildProductModal() {
     await saveCart({ product_id: productId, size, qty: qtyNum, add: true });
     await getCart();
     if (!_lastCartOk) return; // the server refused it; the toast already says why
+
+    // Opened from the wishlist: the item has now moved to the cart, so it leaves the wishlist.
+    if (modalEl.dataset.fromWishlist === "1") {
+      modalEl.dataset.fromWishlist = "0";
+      await removeFromWishlistAfterCart(currentProduct);
+      document.getElementById("pm-wishlist-btn")?._refresh?.();
+    }
 
     const addBtn = document.getElementById("pm-add-cart");
     addBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg> Added!`;
@@ -2050,6 +2066,8 @@ function openProductModal(product, categoryKey, opts = {}) {
   _modalEl.dataset.hasSize = hasSize ? "1" : "0";
   _modalEl.dataset.categoryKey = categoryKey || "";
   _modalEl.dataset.product = JSON.stringify(product);
+  _modalEl.dataset.fromWishlist = opts.fromWishlist ? "1" : "0";
+  wlBtn._refresh = refreshWlBtn;
 
   document.getElementById("product-modal").classList.add("open");
   document.body.style.overflow = "hidden";

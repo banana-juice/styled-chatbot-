@@ -206,8 +206,9 @@ if ($method === 'PUT') {
     $newStatus = isset($body['status']) ? strtolower(trim(as_text($body['status']))) : null;
 
     // Payment status is NOT editable here. It is set only by the PayMongo
-    // webhook (paid / failed) and the customer's own cancel — never by hand,
-    // so a "Paid" order always means PayMongo really confirmed the money.
+    // webhook (paid / failed), the customer's own cancel, and — for cash on
+    // delivery — by marking the order Delivered (see below). Never by hand,
+    // so an online "Paid" order always means PayMongo really confirmed the money.
     // (This used to accept payment_status and let any admin mark an order
     // paid, with a "manual override" dropdown in the admin UI.)
     $requestedPaymentStatus = isset($body['payment_status']) ? strtolower(trim(as_text($body['payment_status']))) : '';
@@ -274,7 +275,19 @@ if ($method === 'PUT') {
             paymongo_expire_checkout_session_quietly($currentOrder['payment_reference']);
         }
     } elseif ($statusChanged) {
-        $pdo->prepare('UPDATE orders SET status = ? WHERE order_id = ?')->execute([$newStatus, $orderId]);
+        // Cash on delivery: the money is handed over when the parcel arrives, so
+        // marking it Delivered also marks it Paid. Online payments are untouched
+        // (only PayMongo can mark those paid). Both changes go in one statement.
+        $codCollected = $newStatus === 'delivered'
+            && strtolower((string) $currentOrder['payment_method']) === 'cod'
+            && in_array($currentOrder['payment_status'], ['cod', 'unpaid'], true);
+
+        if ($codCollected) {
+            $pdo->prepare('UPDATE orders SET status = ?, payment_status = "paid", paid_at = NOW() WHERE order_id = ?')
+                ->execute([$newStatus, $orderId]);
+        } else {
+            $pdo->prepare('UPDATE orders SET status = ? WHERE order_id = ?')->execute([$newStatus, $orderId]);
+        }
 
         $statusToLabel = [
             'pending'    => 'Order Placed',
@@ -285,6 +298,9 @@ if ($method === 'PUT') {
         ];
         $stepLabel = $statusToLabel[$newStatus] ?? ucfirst($newStatus);
         order_timeline_add($pdo, $orderId, $stepLabel, $body['note'] ?? null);
+        if ($codCollected) {
+            order_timeline_add($pdo, $orderId, 'Payment Received', 'Cash collected on delivery');
+        }
     }
 
     // Send status-change email only when fulfillment status changes (tracking
